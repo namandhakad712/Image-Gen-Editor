@@ -19,6 +19,12 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false);
   const [hasKey, setHasKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+
+  const checkUserBalance = async () => {
+    const bal = await pollinationsAPI.checkBalance();
+    setBalance(bal);
+  };
 
   // Grab key from BYOP hash redirect
   useEffect(() => {
@@ -30,6 +36,7 @@ export default function SettingsPage() {
         setApiKey(key);
         setHasKey(true);
         pollinationsAPI.setApiKey(key);
+        checkUserBalance();
         toast.success('Connected! API key received via Pollinations');
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -38,6 +45,8 @@ export default function SettingsPage() {
     if (savedKey) {
       setApiKey(savedKey);
       setHasKey(true);
+      pollinationsAPI.setApiKey(savedKey);
+      checkUserBalance();
     }
   }, []);
 
@@ -52,6 +61,7 @@ export default function SettingsPage() {
     pollinationsAPI.setApiKey(apiKey.trim());
     setHasKey(true);
     setSaved(true);
+    checkUserBalance();
     toast.success('API key saved');
     setTimeout(() => setSaved(false), 2000);
   };
@@ -61,6 +71,7 @@ export default function SettingsPage() {
     pollinationsAPI.setApiKey(null);
     setApiKey('');
     setHasKey(false);
+    setBalance(null);
     toast.success('API key removed');
   };
 
@@ -126,12 +137,18 @@ export default function SettingsPage() {
         {/* Connection Status */}
         {hasKey && (
           <div className="glass-panel rounded-2xl p-4 flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse mt-0.5"></div>
             <div className="flex-1">
               <span className="text-sm font-semibold text-green-700">Connected</span>
               <p className="text-xs text-zinc-400">Your API key is active and ready</p>
+              {balance !== null && (
+                <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 bg-[#EF8354]/10 rounded-md">
+                   <Zap size={12} className="text-[#EF8354]" />
+                   <span className="text-[11px] font-bold text-[#EF8354] uppercase tracking-wider">{balance} Pollen Left</span>
+                </div>
+              )}
             </div>
-            <button onClick={handleRemoveKey} className="text-xs font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
+            <button onClick={handleRemoveKey} className="text-xs font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1 shrink-0 self-start">
               <Trash2 size={12} /> Remove
             </button>
           </div>

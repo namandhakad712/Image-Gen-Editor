@@ -117,6 +117,17 @@ export default function HistoryPage() {
               )}
             </div>
 
+            {/* Warning Banner */}
+            <div className="bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-xl p-3 flex items-start gap-3 shrink-0">
+              <Clock size={16} className="text-[#EF8354] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-zinc-700 leading-relaxed">
+                  Images are stored locally in your browser cache and will be lost if you clear your data.
+                  <span className="font-bold text-[#EF8354] ml-1">Please download them to save safely.</span>
+                </p>
+              </div>
+            </div>
+
             {/* Search */}
             <div className="relative shrink-0">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
@@ -152,7 +163,16 @@ export default function HistoryPage() {
                       onClick={() => setSelectedItem(item)}
                     >
                       <img src={item.imageUrl} alt={item.prompt} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                        <div className="flex justify-end">
+                           <button 
+                             onClick={(e) => { e.stopPropagation(); handleDownload(item.imageUrl, item.id); }}
+                             className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#EF8354] hover:text-white transition-colors"
+                             title="Download image"
+                           >
+                             <Download size={14} />
+                           </button>
+                        </div>
                         <span className="text-[10px] text-white/90 line-clamp-2 font-medium">{item.prompt}</span>
                       </div>
                     </div>

@@ -11,7 +11,7 @@ import { pollinationsAPI } from '@/lib/api';
 import { storage, generateId } from '@/lib/utils';
 import { HistoryItem, GenerationParams } from '@/types';
 
-const MODELS = [
+const DEFAULT_MODELS = [
   { value: 'flux', label: 'Flux Schnell' },
   { value: 'kontext', label: 'FLUX.1 Kontext' },
   { value: 'klein', label: 'FLUX.2 Klein 4B' },
@@ -27,7 +27,21 @@ export default function EditPage() {
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('kontext');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [models, setModels] = useState(DEFAULT_MODELS);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('https://image.pollinations.ai/models')
+      .then(res => res.json())
+      .then((data: any[]) => {
+        const imageModels = data.filter(m => m.type === 'image' || 
+          (m.output_modalities && (m.output_modalities.includes('image') || m.output_modalities.includes('video')))
+        );
+        if (imageModels.length > 0) {
+          setModels(imageModels.map(m => ({ value: m.name, label: m.description || m.name })));
+        }
+      }).catch(err => console.error('Failed to fetch models:', err));
+  }, []);
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -232,7 +246,7 @@ export default function EditPage() {
                   onChange={e => setSelectedModel(e.target.value)}
                   className="w-full md:w-48 appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-2.5 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
                 >
-                  {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {models.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
                 <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
               </div>
