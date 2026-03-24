@@ -4,6 +4,13 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
+/* Theme Colors - CSS Variables */
+:root {
+  --accent-color: #EF8354;
+  --accent-color-light: rgba(239, 131, 84, 0.2);
+  --accent-color-border: rgba(239, 131, 84, 0.4);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -20,6 +27,12 @@ body {
     linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
   background-size: 40px 40px;
   background-position: center center;
+}
+
+/* Selection with theme color */
+::selection {
+  background: var(--accent-color);
+  color: white;
 }
 
 /* ==============================
@@ -78,10 +91,10 @@ input[type=range]::-webkit-slider-thumb {
   height: 14px;
   width: 14px;
   border-radius: 50%;
-  background: #EF8354;
+  background: var(--accent-color);
   cursor: pointer;
   margin-top: -5px;
-  box-shadow: 0 2px 6px rgba(239, 131, 84, 0.4);
+  box-shadow: 0 2px 6px var(--accent-color-light);
   border: 2px solid white;
 }
 
@@ -101,9 +114,9 @@ input[type=range]::-moz-range-thumb {
   height: 14px;
   width: 14px;
   border-radius: 50%;
-  background: #EF8354;
+  background: var(--accent-color);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(239, 131, 84, 0.4);
+  box-shadow: 0 2px 6px var(--accent-color-light);
   border: 2px solid white;
 }
 
@@ -206,8 +219,8 @@ input[type=range]::-moz-range-track {
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, transparent, #EF8354, transparent);
-  box-shadow: 0 0 15px #EF8354;
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  box-shadow: 0 0 15px var(--accent-color);
   animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   z-index: 10;
 }
@@ -234,7 +247,7 @@ input[type=range]::-moz-range-track {
 }
 
 .toggle-switch.active {
-  background: #EF8354;
+  background: var(--accent-color);
 }
 
 .toggle-switch::after {
@@ -278,10 +291,6 @@ input[type=range]::-moz-range-track {
 /* ==============================
    SELECTION
    ============================== */
-::selection {
-  background: #EF8354;
-  color: white;
-}
 
 /* ==============================
    ANIMATIONS

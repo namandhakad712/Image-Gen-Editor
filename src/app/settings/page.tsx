@@ -6,12 +6,13 @@ import {
   Eye, EyeOff, Check, Trash2, Wand2, History, Shield, Info,
   Zap, Globe, ImagePlus, User, Calendar, Shield as ShieldIcon,
   Video, BarChart3, Sparkles, Images, Clock, TrendingUp,
-  ChevronRight, Copy, RefreshCw
+  ChevronRight, Copy, RefreshCw, Palette, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '@/lib/utils';
 import { pollinationsAPI } from '@/lib/api';
 import { UserProfile, ApiKeyInfo, HistoryItem } from '@/types';
+import { useTheme, COLOR_PALETTE } from '@/lib/theme';
 
 const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin + '/settings' : 'https://image-gen-editor.vercel.app/settings';
 const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
@@ -27,6 +28,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [recentImages, setRecentImages] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState({ total: 0, thisWeek: 0, pollenSpent: 0 });
+  
+  const { accentColor, setAccentColor } = useTheme();
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   // Load data with caching
   const loadAllData = useCallback(async () => {
@@ -391,6 +395,69 @@ export default function SettingsPage() {
                 You pay $0 for API usage. Perfect for scaling apps without compute costs.
               </p>
             </div>
+          </div>
+
+          {/* Theme Color Picker */}
+          <div className="md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-lg">
+                  <Palette size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-800">Theme Color</h3>
+                  <p className="text-xs text-zinc-400">Personalize your accent color</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowColorPicker(!showColorPicker)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold border border-zinc-200 hover:bg-zinc-50 transition-all flex items-center gap-2"
+              >
+                {showColorPicker ? 'Close' : 'Choose Color'}
+                <ChevronRight size={14} className={`transition-transform ${showColorPicker ? 'rotate-90' : ''}`} />
+              </button>
+            </div>
+
+            {/* Current Color Preview */}
+            <div className="flex items-center gap-4 mb-4 p-4 rounded-2xl bg-zinc-50/80 border border-zinc-200">
+              <div
+                className="w-12 h-12 rounded-xl shadow-lg"
+                style={{ backgroundColor: accentColor }}
+              />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-zinc-800">Current: {COLOR_PALETTE.find(c => c.value === accentColor)?.name || 'Custom'}</p>
+                <p className="text-xs text-zinc-500 font-mono">{accentColor}</p>
+              </div>
+              <CheckCircle2 size={20} className="text-green-500" />
+            </div>
+
+            {/* Color Palette Grid */}
+            {showColorPicker && (
+              <div className="grid grid-cols-6 md:grid-cols-12 gap-3">
+                {COLOR_PALETTE.map(color => (
+                  <button
+                    key={color.value}
+                    onClick={() => { setAccentColor(color.value); toast.success(`Theme changed to ${color.name}`); }}
+                    className={`group relative w-full aspect-square rounded-xl transition-all hover:scale-110 ${
+                      accentColor === color.value ? 'ring-2 ring-offset-2 ring-zinc-400 scale-110' : ''
+                    }`}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  >
+                    {accentColor === color.value && (
+                      <CheckCircle2 size={20} className="absolute inset-0 m-auto text-white drop-shadow-lg" />
+                    )}
+                    <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-medium text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {color.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[10px] text-zinc-400 mt-4 text-center">
+              ✨ Your color choice is saved and applied across the entire app
+            </p>
           </div>
 
           {/* Recent Images */}

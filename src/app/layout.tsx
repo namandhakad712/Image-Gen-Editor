@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from 'sonner';
+import { ThemeProvider } from '@/lib/theme';
 
 export const metadata: Metadata = {
   title: 'Image Gen Editor — AI Image Generator & Editor',
@@ -27,23 +28,25 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       </head>
       <body className="selection:bg-[#EF8354] selection:text-white">
-        {children}
-        <Toaster
-          position="bottom-center"
-          richColors
-          theme="light"
-          toastOptions={{
-            style: {
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.9)',
-              color: '#3f3f46',
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-              borderRadius: '16px',
-            },
-          }}
-        />
+        <ThemeProvider>
+          {children}
+          <Toaster
+            position="bottom-center"
+            richColors
+            theme="light"
+            toastOptions={{
+              style: {
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.9)',
+                color: '#3f3f46',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+                borderRadius: '16px',
+              },
+            }}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );
