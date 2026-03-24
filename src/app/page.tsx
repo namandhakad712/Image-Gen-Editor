@@ -596,8 +596,9 @@ export default function SpatialImageEditor() {
         continue;
       }
 
+      const toastId = `upload-${file.name}`;
+      
       try {
-        const toastId = `upload-${file.name}`;
         toast.loading('Uploading image to CDN...', { id: toastId });
         
         const imageUrl = await pollinationsAPI.uploadImage(file);
