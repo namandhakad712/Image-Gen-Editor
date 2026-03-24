@@ -14,19 +14,6 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   margin: 0;
   overflow: hidden;
-  background-color: #18181a;
-}
-
-/* ==============================
-   BACKGROUND PATTERNS
-   ============================== */
-.dark-dots {
-  background-image: radial-gradient(#3f3f46 1px, transparent 1px);
-  background-size: 24px 24px;
-  background-position: center center;
-}
-
-.light-grid {
   background-color: #f8f9fa;
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
@@ -209,20 +196,10 @@ input[type=range]::-moz-range-track {
 }
 
 @keyframes scan {
-  0% {
-    top: -10%;
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 1;
-  }
-  100% {
-    top: 110%;
-    opacity: 0;
-  }
+  0% { top: -10%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 110%; opacity: 0; }
 }
 
 /* ==============================
@@ -261,6 +238,27 @@ input[type=range]::-moz-range-track {
 }
 
 /* ==============================
+   INFINITE CANVAS
+   ============================== */
+.infinite-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.canvas-transform {
+  position: absolute;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* Canvas dot pattern */
+.canvas-dots {
+  background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+/* ==============================
    SELECTION
    ============================== */
 ::selection {
@@ -269,34 +267,31 @@ input[type=range]::-moz-range-track {
 }
 
 /* ==============================
-   UTILITY ANIMATIONS
+   ANIMATIONS
    ============================== */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.25s ease-out;
 }
 
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-slide-up {
-  animation: slideUp 0.35s ease-out;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out;
 }

@@ -1,4 +1,4 @@
-# 🎨 Pollinations AI Image Generator
+# 🎨 Image Gen Editor Pro
 
 > **Transform your imagination into stunning visuals with AI-powered image generation and editing**
 

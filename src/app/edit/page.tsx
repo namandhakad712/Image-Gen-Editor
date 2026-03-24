@@ -2,594 +2,253 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Sparkles, Download, Share2, ZoomIn, ZoomOut, RotateCcw,
-  Wand2, ImagePlus, History, Settings, Trash2, X,
-  MousePointer2, Hand, PenLine, Brush, Eraser,
-  Undo2, Redo2, Loader2, Eye, EyeOff, Upload,
-  Check
+  LayoutGrid, Settings, Upload, Wand2, History,
+  Sparkles, Loader2, ImagePlus, Trash2, Download, X,
+  RotateCcw, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
-import { storage } from '@/lib/utils';
+import { storage, generateId } from '@/lib/utils';
+import { HistoryItem, GenerationParams } from '@/types';
 
-const COLORS = [
-  '#EF8354', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-  '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
-  '#FFFFFF', '#000000',
+const MODELS = [
+  { value: 'flux', label: 'Flux Schnell' },
+  { value: 'kontext', label: 'FLUX.1 Kontext' },
+  { value: 'klein', label: 'FLUX.2 Klein 4B' },
+  { value: 'gptimage', label: 'GPT Image 1 Mini' },
+  { value: 'gptimage-large', label: 'GPT Image 1.5' },
+  { value: 'nanobanana', label: 'NanoBanana' },
 ];
 
 export default function EditPage() {
-  // UI State
-  const [showPanel, setShowPanel] = useState<'tools' | 'settings' | 'history'>('tools');
-  const [activeTool, setActiveTool] = useState<'pan' | 'brush' | 'eraser'>('pan');
-
-  // Image State
+  const [menuOpen, setMenuOpen] = useState(false);
   const [sourceImage, setSourceImage] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [editPrompt, setEditPrompt] = useState('');
-  const [editStrength, setEditStrength] = useState(70);
-
-  // Canvas State
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-
-  // Drawing State
-  const [brushSize, setBrushSize] = useState(8);
-  const [brushColor, setBrushColor] = useState('#EF8354');
-  const [opacity, setOpacity] = useState(100);
-  const [history, setHistory] = useState<ImageData[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-
-  // Refs
+  const [resultImage, setResultImage] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState('kontext');
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Handle File Upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setSourceImage(result);
-        setHistory([]);
-        setHistoryIndex(-1);
-        toast.success('Image uploaded');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
         setSourceImage(event.target?.result as string);
-        toast.success('Image uploaded');
+        setResultImage(null);
+        toast.success('Image loaded');
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Save to history
-  const saveToHistory = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(imageData);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  // Undo
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      setHistoryIndex(historyIndex - 1);
-      ctx.putImageData(history[historyIndex - 1], 0, 0);
-      toast.success('Undo');
-    }
-  };
-
-  // Redo
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      setHistoryIndex(historyIndex + 1);
-      ctx.putImageData(history[historyIndex + 1], 0, 0);
-      toast.success('Redo');
-    }
-  };
-
-  // Clear drawing
-  const clearDrawing = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        saveToHistory();
-        toast.success('Canvas cleared');
-      }
-    }
-  };
-
-  // Apply AI Edit
-  const handleApplyEdit = async () => {
-    if (!sourceImage) {
-      toast.error('Please upload an image first');
-      return;
-    }
-    if (!editPrompt.trim()) {
-      toast.error('Please describe the edit');
-      return;
-    }
+  const handleEdit = async () => {
+    if (!sourceImage) { toast.error('Upload an image first'); return; }
+    if (!prompt.trim()) { toast.error('Enter an edit prompt'); return; }
 
     const apiKey = storage.getApiKey();
-    if (!apiKey) {
-      toast.error('Please add API key in settings');
-      setShowPanel('settings');
-      return;
-    }
+    if (!apiKey) { toast.error('Add API key in Settings'); return; }
 
     pollinationsAPI.setApiKey(apiKey);
-    setIsGenerating(true);
+    setIsProcessing(true);
 
     try {
-      // Composite drawing with source image
-      let imageWithDrawing = sourceImage;
-      const canvas = canvasRef.current;
-      if (canvas && history.length > 0) {
-        const tempCanvas = document.createElement('canvas');
-        const ctx = tempCanvas.getContext('2d');
-        if (ctx) {
-          const img = new Image();
-          img.src = sourceImage;
-          await new Promise((resolve) => { img.onload = resolve; });
-          tempCanvas.width = img.width;
-          tempCanvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-          ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, img.width, img.height);
-          imageWithDrawing = tempCanvas.toDataURL('image/png');
-        }
-      }
-
-      const imageUrl = await pollinationsAPI.generateImageOpenAI({
-        prompt: editPrompt,
-        model: 'flux-edit',
-        seed: Math.floor(Math.random() * 1000000),
+      const result = await pollinationsAPI.editImage({
+        model: selectedModel,
+        prompt: prompt,
+        image: sourceImage,
+        width: 1024,
+        height: 1024,
+        seed: Math.floor(Math.random() * 999999),
         enhance: true,
         safe: false,
-        image: imageWithDrawing,
       });
 
-      setSourceImage(imageUrl);
-      clearDrawing();
-      toast.success('Edit applied!');
-      setEditPrompt('');
+      setResultImage(result);
+
+      // Save to history
+      const historyItem: HistoryItem = {
+        id: generateId(), type: 'edit', prompt,
+        model: selectedModel, imageUrl: result,
+        params: { model: selectedModel, prompt, width: 1024, height: 1024, seed: -1, enhance: true, safe: false },
+        createdAt: Date.now(), referenceImage: sourceImage,
+      };
+      storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 50));
+
+      toast.success('Image edited!');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to apply edit');
+      console.error('Edit error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to edit image');
     } finally {
-      setIsGenerating(false);
+      setIsProcessing(false);
     }
   };
 
-  // Drawing handlers
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
-
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (activeTool !== 'brush' && activeTool !== 'eraser') return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = (clientX - rect.left) * (canvas.width / rect.width);
-    const y = (clientY - rect.top) * (canvas.height / rect.height);
-
-    setLastPos({ x, y });
-
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.strokeStyle = activeTool === 'eraser' ? 'rgba(0,0,0,1)' : brushColor;
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.globalAlpha = opacity / 100;
-
-      if (activeTool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
+  const handleDownload = async () => {
+    if (!resultImage) return;
+    try {
+      // If it's a base64 image
+      if (resultImage.startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = resultImage;
+        link.download = `edited-${Date.now()}.png`;
+        link.click();
       } else {
-        ctx.globalCompositeOperation = 'source-over';
+        const response = await fetch(resultImage);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `edited-${Date.now()}.png`;
+        link.click();
+        window.URL.revokeObjectURL(url);
       }
-
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-    }
-
-    setIsDrawing(true);
+      toast.success('Downloaded!');
+    } catch { toast.error('Failed to download'); }
   };
-
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = (clientX - rect.left) * (canvas.width / rect.width);
-    const y = (clientY - rect.top) * (canvas.height / rect.height);
-
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-
-    setLastPos({ x, y });
-  };
-
-  const stopDrawing = () => {
-    if (isDrawing) {
-      saveToHistory();
-    }
-    setIsDrawing(false);
-  };
-
-  // Canvas pan handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (activeTool === 'pan' || e.button === 1) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
-    }
-    if (isDrawing) {
-      draw(e);
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-    stopDrawing();
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || activeTool === 'pan') {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setZoom((prev) => Math.max(0.5, Math.min(3, prev + delta)));
-    }
-  };
-
-  // Download
-  const downloadImage = () => {
-    if (!sourceImage) return;
-    const link = document.createElement('a');
-    link.href = sourceImage;
-    link.download = `pollinations-edit-${Date.now()}.png`;
-    link.click();
-    toast.success('Image downloaded');
-  };
-
-  // Reset
-  const handleReset = () => {
-    setSourceImage(null);
-    setEditPrompt('');
-    clearDrawing();
-    toast.success('Reset complete');
-  };
-
-  // Setup canvas
-  useEffect(() => {
-    if (canvasRef.current) {
-      canvasRef.current.width = 2048;
-      canvasRef.current.height = 2048;
-    }
-  }, []);
 
   return (
-    <div className="w-full h-screen bg-[#0a0a0f] overflow-hidden relative">
-      {/* Top Toolbar */}
-      <div className="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/10">
-        <div className="flex items-center justify-between px-4 py-3">
-          {/* Left - Nav */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => window.location.href = '/'}
-              className="toolbar-btn text-zinc-400 hover:text-white hover:bg-white/5"
-            >
-              <Wand2 size={18} />
-              Generate
-            </button>
-            <div className="h-6 w-px bg-white/20" />
-            <span className="text-lg font-bold text-white">Image Editor</span>
-            <div className="h-6 w-px bg-white/20" />
-            <button
-              onClick={() => window.location.href = '/history'}
-              className="toolbar-btn text-zinc-400 hover:text-white hover:bg-white/5"
-            >
-              <History size={18} />
-              Gallery
-            </button>
-          </div>
+    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto">
 
-          {/* Center - Zoom */}
-          <div className="flex items-center gap-2 glass-panel rounded-xl p-1">
-            <button
-              onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-            >
-              <ZoomOut size={16} />
-            </button>
-            <span className="text-sm text-zinc-400 w-14 text-center">{Math.round(zoom * 100)}%</span>
-            <button
-              onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-            >
-              <ZoomIn size={16} />
-            </button>
-            <div className="w-px h-4 bg-white/20 mx-1" />
-            <button
-              onClick={() => { setPan({ x: 0, y: 0 }); setZoom(1); }}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-            >
-              <RotateCcw size={16} />
-            </button>
-          </div>
+      {/* Top-left nav pill */}
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+        <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+          >
+            <LayoutGrid size={16} />
+            <span className="hidden sm:inline">Gallery</span>
+          </button>
+          <div className="w-px h-4 bg-zinc-200 mx-2"></div>
+          <button onClick={() => window.location.href = '/settings'} className="p-1.5 rounded-full text-zinc-500 hover:bg-black/5 transition-colors">
+            <Settings size={16} />
+          </button>
 
-          {/* Right - Actions */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleUndo}
-              disabled={historyIndex <= 0}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30"
-            >
-              <Undo2 size={18} />
-            </button>
-            <button
-              onClick={handleRedo}
-              disabled={historyIndex >= history.length - 1}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 disabled:opacity-30"
-            >
-              <Redo2 size={18} />
-            </button>
-            <div className="w-px h-6 bg-white/20" />
-            <button
-              onClick={clearDrawing}
-              className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            >
-              <Trash2 size={18} />
-            </button>
-            {sourceImage && (
-              <button
-                onClick={downloadImage}
-                className="toolbar-btn bg-[#EF8354] text-white hover:bg-[#e27344]"
+          {menuOpen && (
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
+              <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <Wand2 size={16} /> Image Generation
+              </a>
+              <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <History size={16} /> History / Gallery
+              </a>
+              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+                <ImagePlus size={16} /> Image Editor
+              </a>
+              <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <Settings size={16} /> Settings
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+      {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
+
+      {/* Main content */}
+      <div className="max-w-5xl mx-auto pt-24 px-4 pb-10 space-y-6">
+
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+            <ImagePlus size={20} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-zinc-800">Image Editor</h1>
+            <p className="text-xs text-zinc-400">Upload an image and describe your edits</p>
+          </div>
+        </div>
+
+        {/* Image comparison */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Source */}
+          <div className="glass-panel rounded-3xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-800">Source</h3>
+              {sourceImage && (
+                <button onClick={() => { setSourceImage(null); setResultImage(null); }} className="text-[11px] font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
+                  <Trash2 size={12} /> Clear
+                </button>
+              )}
+            </div>
+            {sourceImage ? (
+              <div className="rounded-2xl overflow-hidden bg-zinc-100">
+                <img src={sourceImage} alt="Source" className="w-full object-contain max-h-[50vh]" />
+              </div>
+            ) : (
+              <div
+                className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all group"
+                onClick={() => fileInputRef.current?.click()}
               >
-                <Download size={18} />
-                Save
-              </button>
+                <input type="file" ref={fileInputRef} onChange={handleUpload} accept="image/*" className="hidden" />
+                <div className="w-14 h-14 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] mb-3 group-hover:scale-110 transition-transform">
+                  <Upload size={24} />
+                </div>
+                <span className="text-sm font-semibold text-zinc-700">Upload image</span>
+                <span className="text-xs text-zinc-400 mt-1">Click or drag to upload</span>
+              </div>
+            )}
+          </div>
+
+          {/* Result */}
+          <div className="glass-panel rounded-3xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-zinc-800">Result</h3>
+              {resultImage && (
+                <button onClick={handleDownload} className="text-[11px] font-bold text-[#EF8354] hover:text-[#e27344] uppercase tracking-wider flex items-center gap-1">
+                  <Download size={12} /> Download
+                </button>
+              )}
+            </div>
+            {resultImage ? (
+              <div className="rounded-2xl overflow-hidden bg-zinc-100">
+                <img src={resultImage} alt="Result" className="w-full object-contain max-h-[50vh]" />
+              </div>
+            ) : (
+              <div className="aspect-square rounded-2xl bg-zinc-50 flex flex-col items-center justify-center">
+                <Sparkles className="text-zinc-300 mb-3" size={32} />
+                <span className="text-sm text-zinc-400 font-medium">Result will appear here</span>
+              </div>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Canvas Area */}
-      <div
-        ref={containerRef}
-        className="absolute inset-0 pt-16"
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <div
-          className="w-full h-full relative"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: 'center center',
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
-        >
-          {!sourceImage ? (
-            <div
-              className="absolute inset-0 flex items-center justify-center cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                accept="image/*"
-                className="hidden"
-              />
-              <div className="text-center">
-                <div className="w-20 h-20 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center mx-auto mb-6">
-                  <Upload className="h-10 w-10 text-[#EF8354]" />
-                </div>
-                <h2 className="text-xl font-bold text-white mb-2">Upload an Image</h2>
-                <p className="text-zinc-400">Drag & drop or click to browse</p>
-              </div>
-            </div>
-          ) : (
-            <div className="relative" style={{ width: 2048, height: 2048 }}>
-              <img
-                src={sourceImage}
-                alt="Source"
-                className="absolute inset-0 w-full h-full object-contain"
-                draggable={false}
-              />
-              <canvas
-                ref={canvasRef}
-                className="absolute inset-0"
-                style={{ pointerEvents: activeTool === 'pan' ? 'none' : 'auto' }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
+        {/* Edit controls */}
+        <div className="glass-panel rounded-3xl p-5 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <textarea
+                className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl p-3 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none h-20"
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                placeholder="Describe what to change..."
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEdit(); } }}
               />
             </div>
-          )}
-
-          {/* Generating Overlay */}
-          {isGenerating && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="text-center">
-                <Loader2 className="h-12 w-12 text-[#EF8354] animate-spin mx-auto mb-4" />
-                <p className="text-white font-medium">Applying AI Edit...</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Tools Panel */}
-      {showPanel === 'tools' && (
-        <div className="fixed left-6 top-1/2 -translate-y-1/2 z-50">
-          <div className="glass-panel rounded-2xl p-2 border border-white/10 flex flex-col gap-2">
-            <button
-              onClick={() => setActiveTool('pan')}
-              className={`p-3 rounded-xl transition-all ${activeTool === 'pan' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-              title="Pan Tool"
-            >
-              <Hand size={20} />
-            </button>
-            <button
-              onClick={() => setActiveTool('brush')}
-              className={`p-3 rounded-xl transition-all ${activeTool === 'brush' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-              title="Brush Tool"
-            >
-              <Brush size={20} />
-            </button>
-            <button
-              onClick={() => setActiveTool('eraser')}
-              className={`p-3 rounded-xl transition-all ${activeTool === 'eraser' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-              title="Eraser Tool"
-            >
-              <Eraser size={20} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Panel - Edit Controls */}
-      {sourceImage && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-3xl px-4">
-          <div className="glass-panel rounded-3xl p-6 border border-white/10">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="flex-1">
-                <textarea
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#EF8354]/50 resize-none h-20"
-                  placeholder="Describe what you want to change..."
-                  value={editPrompt}
-                  onChange={(e) => setEditPrompt(e.target.value)}
-                />
+            <div className="flex flex-col gap-2 shrink-0">
+              <div className="relative">
+                <select
+                  value={selectedModel}
+                  onChange={e => setSelectedModel(e.target.value)}
+                  className="w-full md:w-48 appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-2.5 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+                >
+                  {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
               </div>
               <button
-                onClick={handleApplyEdit}
-                disabled={isGenerating || !editPrompt.trim()}
-                className={`px-6 py-4 rounded-xl font-bold text-white flex items-center gap-2 transition-all ${isGenerating || !editPrompt.trim()
-                    ? 'bg-zinc-600 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#EF8354] to-purple-600 hover:from-[#e27344] hover:to-purple-500'
-                  }`}
+                onClick={handleEdit}
+                disabled={isProcessing || !sourceImage}
+                className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all
+                  ${isProcessing || !sourceImage ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed' : 'bg-[#EF8354] text-white hover:bg-[#e27344] shadow-lg shadow-[#EF8354]/20 active:scale-95'}`}
               >
-                {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Sparkles size={20} />}
-                {isGenerating ? 'Applying...' : 'Apply Edit'}
+                {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Processing...</> : <><Wand2 size={16} /> Apply Edit</>}
               </button>
-            </div>
-
-            <div className="flex items-center gap-6">
-              {/* Brush Size */}
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-zinc-400">Brush Size</span>
-                  <span className="text-xs text-[#EF8354]">{brushSize}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="50"
-                  value={brushSize}
-                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                />
-              </div>
-
-              {/* Opacity */}
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-zinc-400">Opacity</span>
-                  <span className="text-xs text-[#EF8354]">{opacity}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="100"
-                  value={opacity}
-                  onChange={(e) => setOpacity(parseInt(e.target.value))}
-                />
-              </div>
-
-              {/* Edit Strength */}
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-zinc-400">Edit Strength</span>
-                  <span className="text-xs text-[#EF8354]">{editStrength}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editStrength}
-                  onChange={(e) => setEditStrength(parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-
-            {/* Colors */}
-            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/10">
-              {COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setBrushColor(color)}
-                  className={`w-8 h-8 rounded-lg border-2 transition-all ${brushColor === color ? 'border-white scale-110' : 'border-transparent hover:scale-105'}`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
             </div>
           </div>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }

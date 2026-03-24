@@ -2,288 +2,247 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Key, Sparkles, ExternalLink, Check, Copy, Eye, EyeOff,
-  Shield, Zap, Info, AlertCircle, ArrowRight, Github, BookOpen
+  LayoutGrid, Settings as SettingsIcon, Key, LogIn, ExternalLink,
+  Eye, EyeOff, Check, Trash2, X, Wand2, History, Shield, Info,
+  Zap, Globe, ImagePlus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '@/lib/utils';
+import { pollinationsAPI } from '@/lib/api';
+
+const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin + '/settings' : 'https://image-gen-editor.vercel.app/settings';
+const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
 
 export default function SettingsPage() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
-  const [isValid, setIsValid] = useState<boolean | null>(null);
+  const [hasKey, setHasKey] = useState(false);
+  const [saved, setSaved] = useState(false);
 
+  // Grab key from BYOP hash redirect
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const key = hashParams.get('api_key');
+      if (key) {
+        storage.setApiKey(key);
+        setApiKey(key);
+        setHasKey(true);
+        pollinationsAPI.setApiKey(key);
+        toast.success('Connected! API key received via Pollinations');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
     const savedKey = storage.getApiKey();
     if (savedKey) {
       setApiKey(savedKey);
-      setIsValid(true);
+      setHasKey(true);
     }
   }, []);
 
-  const handleSaveKey = () => {
-    if (!apiKey.trim()) {
-      toast.error('Please enter an API key');
-      return;
-    }
-
-    storage.setApiKey(apiKey.trim());
-    setIsValidating(true);
-
-    // Simulate validation (in real app, would make API call)
-    setTimeout(() => {
-      setIsValidating(false);
-      setIsValid(true);
-      toast.success('API key saved successfully!');
-    }, 1000);
+  const handleBYOPAuth = () => {
+    const params = new URLSearchParams({ redirect_url: APP_REDIRECT_URL });
+    window.location.href = `${BYOP_AUTH_URL}?${params}`;
   };
 
-  const handleClearKey = () => {
+  const handleSaveKey = () => {
+    if (!apiKey.trim()) { toast.error('Please enter an API key'); return; }
+    storage.setApiKey(apiKey.trim());
+    pollinationsAPI.setApiKey(apiKey.trim());
+    setHasKey(true);
+    setSaved(true);
+    toast.success('API key saved');
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleRemoveKey = () => {
+    storage.removeApiKey();
+    pollinationsAPI.setApiKey(null);
     setApiKey('');
-    setIsValid(null);
-    storage.clearApiKey();
+    setHasKey(false);
     toast.success('API key removed');
   };
 
-  const handleCopyKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    toast.success('API key copied to clipboard');
-  };
-
-  const maskKey = (key: string) => {
-    if (key.length < 10) return '••••••••';
-    return `${key.slice(0, 4)}${'•'.repeat(key.length - 8)}${key.slice(-4)}`;
+  const handleClearHistory = () => {
+    if (confirm('Clear all generation history?')) {
+      storage.clearHistory();
+      toast.success('History cleared');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#18181a] dark-dots p-6 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF8354] to-purple-600 flex items-center justify-center">
-            <Key className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Settings</h1>
-            <p className="text-sm text-zinc-400">Manage your API key and preferences</p>
-          </div>
-        </div>
+    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto">
 
-        {/* API Key Card */}
-        <div className="glass-panel rounded-3xl p-6 md:p-8 mb-6">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="h-6 w-6 text-[#EF8354]" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-zinc-800 mb-1">
-                Pollinations API Key
-              </h2>
-              <p className="text-sm text-zinc-500">
-                Get your free API key to start generating images. All registered accounts receive free pollen that refills hourly.
-              </p>
-            </div>
-          </div>
+      {/* Top-left nav pill */}
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+        <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+          >
+            <LayoutGrid size={16} />
+            <span className="hidden sm:inline">Gallery</span>
+          </button>
+          <div className="w-px h-4 bg-zinc-200 mx-2"></div>
+          <button className="p-1.5 rounded-full bg-[#EF8354]/10 text-[#EF8354] transition-colors">
+            <SettingsIcon size={16} />
+          </button>
 
-          <div className="space-y-4">
-            <div className="relative">
-              <label className="block text-sm font-semibold text-zinc-700 mb-2">
-                API Key
-              </label>
-              <div className="flex gap-3">
-                <div className="relative flex-1">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk_..."
-                    className="w-full px-4 py-3 pr-12 bg-white/50 border border-zinc-200 rounded-xl text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 font-mono"
-                  />
-                  <button
-                    onClick={() => setShowKey(!showKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
-                  >
-                    {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-                {apiKey && (
-                  <button
-                    onClick={handleCopyKey}
-                    className="px-4 py-3 bg-white border border-zinc-200 rounded-xl text-zinc-600 hover:bg-zinc-50 transition-colors"
-                    title="Copy API Key"
-                  >
-                    <Copy size={18} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Status */}
-            {isValid !== null && (
-              <div
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl ${isValid
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}
-              >
-                {isValid ? (
-                  <>
-                    <Check size={16} />
-                    <span className="text-sm font-medium">API key is valid and ready to use</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle size={16} />
-                    <span className="text-sm font-medium">Invalid API key</span>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                onClick={handleSaveKey}
-                disabled={isValidating || !apiKey.trim()}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all ${isValidating || !apiKey.trim()
-                    ? 'bg-zinc-400 cursor-not-allowed'
-                    : 'bg-[#EF8354] hover:bg-[#e27344] shadow-lg shadow-[#EF8354]/25'
-                  }`}
-              >
-                {isValidating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Validating...
-                  </>
-                ) : (
-                  <>
-                    <Check size={18} />
-                    Save API Key
-                  </>
-                )}
-              </button>
-
-              {apiKey && (
-                <button
-                  onClick={handleClearKey}
-                  className="px-6 py-3 bg-white border border-zinc-200 rounded-xl text-zinc-700 font-semibold hover:bg-zinc-50 transition-colors"
-                >
-                  Remove Key
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Get API Key Card */}
-        <div className="glass-panel rounded-3xl p-6 md:p-8 mb-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-              <Zap className="h-6 w-6 text-purple-500" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-zinc-800 mb-2">
-                Don't have an API key?
-              </h2>
-              <p className="text-sm text-zinc-500 mb-4">
-                Sign up for free and get instant access to generate images. Free tier includes hourly pollen refills.
-              </p>
-              <a
-                href="https://enter.pollinations.ai"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-xl font-semibold hover:bg-purple-600 transition-colors"
-              >
-                Get Free API Key
-                <ExternalLink size={18} />
+          {menuOpen && (
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
+              <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <Wand2 size={16} /> Image Generation
+              </a>
+              <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <History size={16} /> History / Gallery
+              </a>
+              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <ImagePlus size={16} /> Image Editor
+              </a>
+              <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+                <SettingsIcon size={16} /> Settings
               </a>
             </div>
+          )}
+        </div>
+      </div>
+      {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
+
+      {/* Main content */}
+      <div className="max-w-xl mx-auto pt-24 px-4 pb-10 space-y-5">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+            <SettingsIcon size={20} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-zinc-800">Settings</h1>
+            <p className="text-xs text-zinc-400">Manage your API key and preferences</p>
           </div>
         </div>
 
-        {/* Info Cards */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* About Pollen */}
-          <div className="glass-panel rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center">
-                <Info className="h-5 w-5 text-[#EF8354]" />
-              </div>
-              <h3 className="font-bold text-zinc-800">About Pollen</h3>
+        {/* Connection Status */}
+        {hasKey && (
+          <div className="glass-panel rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+            <div className="flex-1">
+              <span className="text-sm font-semibold text-green-700">Connected</span>
+              <p className="text-xs text-zinc-400">Your API key is active and ready</p>
             </div>
-            <p className="text-sm text-zinc-500 leading-relaxed">
-              Pollen is the credit system used by Pollinations AI. Approximately 1 pollen = $1.
-              Free accounts receive hourly refills, and you can bring your own pollen for higher usage.
-            </p>
+            <button onClick={handleRemoveKey} className="text-xs font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
+              <Trash2 size={12} /> Remove
+            </button>
           </div>
+        )}
 
-          {/* Documentation */}
-          <div className="glass-panel rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <BookOpen className="h-5 w-5 text-blue-500" />
-              </div>
-              <h3 className="font-bold text-zinc-800">Documentation</h3>
+        {/* BYOP Connect */}
+        <div className="glass-panel rounded-3xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+              <LogIn size={18} />
             </div>
-            <p className="text-sm text-zinc-500 leading-relaxed">
-              Learn more about the Pollinations API, available models, and advanced features
-              in the comprehensive documentation.
-            </p>
-            <a
-              href="https://gen.pollinations.ai/api/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-3 text-sm font-semibold text-[#EF8354] hover:text-[#e27344] transition-colors"
-            >
-              View API Docs
-              <ArrowRight size={16} />
-            </a>
-          </div>
-        </div>
-
-        {/* Security Notice */}
-        <div className="mt-6 glass-panel rounded-2xl p-6 border border-amber-200/50 bg-amber-50/50">
-          <div className="flex items-start gap-3">
-            <Shield className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-amber-800 mb-1">Security Notice</h4>
-              <p className="text-sm text-amber-700">
-                Your API key is stored locally in your browser and never sent to any server except Pollinations AI API endpoints.
-                Never share your API key or commit it to version control.
-              </p>
+              <h2 className="text-sm font-bold text-zinc-800">Connect with Pollinations</h2>
+              <p className="text-xs text-zinc-400">One-click sign-in. Your pollen, your usage.</p>
             </div>
+          </div>
+          <button
+            onClick={handleBYOPAuth}
+            className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] shadow-lg shadow-[#EF8354]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <ExternalLink size={16} /> Connect via Pollinations
+          </button>
+          <div className="flex items-start gap-2 pt-1">
+            <Info size={14} className="text-zinc-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              You&apos;ll be redirected to Pollinations to authorize. After approval, your API key will be automatically saved. Keys expire in 30 days.
+            </p>
           </div>
         </div>
 
-        {/* Footer Links */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-500">
-          <a
-            href="https://github.com/pollinations/pollinations"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 hover:text-zinc-700 transition-colors"
-          >
-            <Github size={16} />
-            GitHub
-          </a>
-          <a
-            href="https://pollinations.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-zinc-700 transition-colors"
-          >
-            Pollinations.ai
-          </a>
-          <a
-            href="https://gen.pollinations.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-zinc-700 transition-colors"
-          >
-            API Reference
-          </a>
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-zinc-200"></div>
+          <span className="text-xs font-semibold text-zinc-400 uppercase">or use manual key</span>
+          <div className="flex-1 h-px bg-zinc-200"></div>
         </div>
+
+        {/* Manual API Key */}
+        <div className="glass-panel rounded-3xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-600">
+              <Key size={18} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-zinc-800">Manual API Key</h2>
+              <p className="text-xs text-zinc-400">Paste your sk_ key from enter.pollinations.ai</p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1 flex items-center bg-zinc-100/80 rounded-xl px-3 py-2.5 border border-zinc-200/50">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="sk_..."
+                className="w-full bg-transparent text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none font-mono"
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveKey(); }}
+              />
+            </div>
+            <button onClick={() => setShowKey(!showKey)} className="p-2.5 rounded-xl border border-zinc-200/50 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 transition-colors">
+              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          <button
+            onClick={handleSaveKey}
+            className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${saved ? 'bg-green-500 text-white' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+          >
+            {saved ? <span className="flex items-center justify-center gap-1.5"><Check size={14} /> Saved!</span> : 'Save API Key'}
+          </button>
+        </div>
+
+        {/* Get Key Info */}
+        <div className="glass-panel rounded-3xl p-6 space-y-3">
+          <h3 className="text-sm font-bold text-zinc-800 flex items-center gap-2">
+            <Zap size={16} className="text-[#EF8354]" /> How to get an API key
+          </h3>
+          <ol className="text-xs text-zinc-500 space-y-2 pl-4 list-decimal">
+            <li>Go to <a href="https://enter.pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-[#EF8354] hover:underline font-medium">enter.pollinations.ai</a></li>
+            <li>Sign in with your GitHub account</li>
+            <li>Click <strong>&quot;+ API Key&quot;</strong> to create a secret key (sk_...)</li>
+            <li>Paste it above or use the one-click Connect button</li>
+          </ol>
+          <div className="flex items-start gap-2 pt-2 border-t border-zinc-200/50">
+            <Globe size={14} className="text-zinc-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-zinc-400">
+              Every account gets free Pollen that refills hourly. All images are generated via the Pollinations cloud API — nothing is stored on our servers.
+            </p>
+          </div>
+        </div>
+
+        {/* Data Management */}
+        <div className="glass-panel rounded-3xl p-6 space-y-4">
+          <h3 className="text-sm font-bold text-zinc-800 flex items-center gap-2">
+            <Shield size={16} className="text-zinc-500" /> Data & Privacy
+          </h3>
+          <div className="space-y-3 text-xs text-zinc-500">
+            <p>• API key is stored only in your browser&apos;s localStorage</p>
+            <p>• Generation history is stored locally in your browser</p>
+            <p>• Images are served from Pollinations CDN URLs</p>
+            <p>• No data is sent to any third-party besides Pollinations AI</p>
+          </div>
+          <button
+            onClick={handleClearHistory}
+            className="w-full py-2.5 rounded-xl border border-red-200 text-red-400 font-semibold text-sm hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Trash2 size={14} /> Clear All History
+          </button>
+        </div>
+
       </div>
     </div>
   );
