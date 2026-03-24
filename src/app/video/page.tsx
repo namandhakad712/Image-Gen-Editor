@@ -42,13 +42,14 @@ export default function VideoPage() {
   const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
-  // Fetch video models
+  // Fetch video models from live API
   useEffect(() => {
     fetch('https://image.pollinations.ai/models')
       .then(res => res.json())
       .then((data: any[]) => {
+        // Filter for video models based on output_modalities
         const videoModels = data.filter(m => 
-          m.output_modalities?.includes('video') || m.type === 'video'
+          m.output_modalities?.includes('video')
         );
         if (videoModels.length > 0) {
           setModels(videoModels.map(m => ({ 

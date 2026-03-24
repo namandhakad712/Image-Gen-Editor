@@ -44,7 +44,6 @@ const MODIFIER_PROMPTS = ALL_MODIFIERS.reduce((acc, m) => {
 }, {} as Record<string, string>);
 
 const DEFAULT_MODELS = [
-  { value: 'nova-fast', label: 'Amazon Nova Micro - Fast & Cheap' },
   { value: 'flux', label: 'Flux Schnell' },
   { value: 'zimage', label: 'Z-Image Turbo' },
   { value: 'gptimage', label: 'GPT Image 1 Mini' },
@@ -64,6 +63,37 @@ const DEFAULT_MODELS = [
   { value: 'p-image-edit', label: 'Pruna p-image-edit' },
   { value: 'nova-canvas', label: 'Amazon Nova Canvas' },
 ];
+
+// Helper function to filter models by supported endpoints
+function filterModelsByEndpoint(models: any[], endpoint: string): any[] {
+  return models.filter(m => 
+    m.supported_endpoints?.includes(endpoint) || 
+    m.output_modalities?.includes('image') ||
+    m.output_modalities?.includes('video')
+  );
+}
+
+// Filter image models (models that support image generation endpoints)
+function getImageModels(models: any[]): any[] {
+  return filterModelsByEndpoint(models, '/image/{prompt}')
+    .filter(m => m.output_modalities?.includes('image'));
+}
+
+// Filter video models (models that output video)
+function getVideoModels(models: any[]): any[] {
+  return models.filter(m => 
+    m.output_modalities?.includes('video') ||
+    m.supported_endpoints?.includes('/video/{prompt}')
+  );
+}
+
+// Filter text models (models that support text generation)
+function getTextModelsForEnhancement(models: any[]): any[] {
+  return models.filter(m => 
+    m.supported_endpoints?.includes('/v1/chat/completions') ||
+    m.supported_endpoints?.includes('/text/{prompt}')
+  ).filter(m => m.output_modalities?.includes('text'));
+}
 
 const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin : 'https://image-gen-editor.vercel.app';
 const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
@@ -146,17 +176,16 @@ export default function SpatialImageEditor() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   // =============================================
-  //  Live Models Fetch
+  //  Live Models Fetch (Image models only)
   // =============================================
   useEffect(() => {
     fetch('https://image.pollinations.ai/models')
       .then(res => res.json())
       .then((data: any[]) => {
-        const imageModels = data.filter(m => m.type === 'image' || 
-          (m.output_modalities && (m.output_modalities.includes('image') || m.output_modalities.includes('video')))
-        );
+        // Filter for image models only based on supported_endpoints and output_modalities
+        const imageModels = getImageModels(data);
         if (imageModels.length > 0) {
-          setModels(imageModels.map(m => ({ value: m.name, label: m.description || m.name })));
+          setModels(imageModels.map(m => ({ value: m.name, label: m.description || m.name || m.id })));
         }
       }).catch(err => console.error('Failed to fetch models:', err));
   }, []);
