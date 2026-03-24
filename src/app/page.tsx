@@ -75,7 +75,7 @@ export default function SpatialImageEditor() {
   const [seed, setSeed] = useState(-1);
   const [steps, setSteps] = useState(30);
   const [activeModifiers, setActiveModifiers] = useState<string[]>(['High Resolution', 'Studio Lighting', 'Minimalist']);
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState('flux');
   const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
@@ -172,11 +172,11 @@ export default function SpatialImageEditor() {
         model: selectedModel, prompt: fullPrompt,
         width: aspectRatio.width, height: aspectRatio.height,
         seed: actualSeed, enhance, safe, quality: 'high' as const,
-        image: referenceImage || undefined,
+        image: referenceImages.length > 0 ? referenceImages.join('|') : undefined,
       };
 
       let imageUrl: string;
-      if (referenceImage) {
+      if (referenceImages.length > 0) {
         imageUrl = await pollinationsAPI.generateImageOpenAI({
           prompt: fullPrompt, model: selectedModel,
           seed: actualSeed, enhance, safe,
@@ -203,12 +203,12 @@ export default function SpatialImageEditor() {
       const historyItem: HistoryItem = {
         id: generateId(), type: 'generate', prompt: fullPrompt,
         model: selectedModel, imageUrl, params, createdAt: Date.now(),
-        referenceImage: referenceImage || undefined,
+        referenceImage: referenceImages.length > 0 ? referenceImages[0] : undefined,
       };
       storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 50));
 
       toast.success('Image generated!');
-      setReferenceImage(null);
+      setReferenceImages([]);
       if (window.innerWidth < 768) setIsSidebarOpen(false);
     } catch (error) {
       console.error('Generation error:', error);
@@ -218,16 +218,54 @@ export default function SpatialImageEditor() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const processFiles = (files: File[]) => {
+    const availableSlots = 4 - referenceImages.length;
+    const filesToUpload = files.slice(0, availableSlots);
+    
+    if (filesToUpload.length === 0) {
+      if (files.length > 0) toast.error('Maximum 4 reference images allowed');
+      return;
+    }
+
+    filesToUpload.forEach(file => {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Only images are allowed');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
-        setReferenceImage(event.target?.result as string);
-        toast.success('Reference image uploaded');
+        setReferenceImages(prev => {
+          if (prev.length >= 4) return prev;
+          return [...prev, event.target?.result as string];
+        });
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(Array.from(e.target.files || []));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    processFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const handleAddUrl = () => {
+    const url = window.prompt("Enter image URL:");
+    if (!url) return;
+    if (referenceImages.length >= 4) {
+      toast.error('Maximum 4 reference images allowed');
+      return;
     }
+    setReferenceImages(prev => [...prev, url]);
+  };
+
+  const removeReferenceImage = (index: number) => {
+    setReferenceImages(prev => prev.filter((_, i) => i !== index));
+    toast.success('Image removed');
   };
 
   const toggleModifier = (mod: string) => {
@@ -490,31 +528,57 @@ export default function SpatialImageEditor() {
         <section className="space-y-3 shrink-0">
           <div className="flex justify-between items-center">
             <label className="text-sm font-semibold text-zinc-700">Reference Image</label>
-            {referenceImage ? (
-              <button onClick={() => setReferenceImage(null)} className="text-[11px] font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
-                <Trash2 size={12} /> Clear
+            {referenceImages.length > 0 ? (
+              <button onClick={() => setReferenceImages([])} className="text-[11px] font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
+                <Trash2 size={12} /> Clear All
               </button>
             ) : (
               <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">Optional</span>
             )}
           </div>
-          <div
-            className="w-full aspect-[4/2.5] rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all group relative overflow-hidden"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
-            {referenceImage ? (
-              <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
-            ) : (
-              <>
-                <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] mb-3 group-hover:scale-110 transition-transform">
+          
+          {referenceImages.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {referenceImages.map((imgUrl, i) => (
+                <div key={i} className="relative aspect-square rounded-xl overflow-hidden group">
+                  <img src={imgUrl} alt={`Ref ${i+1}`} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button onClick={(e) => { e.stopPropagation(); removeReferenceImage(i); }} className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {referenceImages.length < 4 && (
+            <div
+              className={`w-full ${referenceImages.length > 0 ? 'aspect-[4/1]' : 'aspect-[4/2.5]'} rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all group relative overflow-hidden`}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+            >
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" multiple className="hidden" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] group-hover:scale-110 transition-transform">
                   <ImagePlus size={20} />
                 </div>
-                <span className="text-sm font-semibold text-zinc-700">Drop image here</span>
-                <span className="text-xs text-zinc-400 mt-1">or click to browse</span>
-              </>
-            )}
-          </div>
+                {!referenceImages.length ? (
+                  <div className="text-left">
+                    <span className="text-sm font-semibold text-zinc-700 block">Drop images here</span>
+                    <span className="text-xs text-zinc-400">Up to 4 reference images</span>
+                  </div>
+                ) : (
+                  <span className="text-sm font-semibold text-zinc-700">Add another image</span>
+                )}
+              </div>
+            </div>
+          )}
+          {referenceImages.length < 4 && (
+             <button onClick={handleAddUrl} className="w-full text-xs font-semibold text-zinc-500 hover:text-[#EF8354] py-1 transition-colors">
+               Or paste image URL
+             </button>
+          )}
         </section>
 
         {/* Aspect Ratio */}
