@@ -154,7 +154,7 @@ export class PollinationsAPI {
     const { model, prompt, image, seed, enhance, safe, negativePrompt, nologo, transparent, width, height } = params;
 
     // Use GET /image/{prompt} endpoint with image query parameter for editing
-    // This is the correct endpoint according to Pollinations API docs
+    // Image can be: public URL, multiple URLs separated by | or ,
     const urlParams = new URLSearchParams();
     urlParams.set('model', model || 'flux');
     urlParams.set('seed', seed.toString());
@@ -167,52 +167,71 @@ export class PollinationsAPI {
     if (nologo) urlParams.set('nologo', 'true');
     if (transparent) urlParams.set('transparent', 'true');
     
-    // Image parameter for editing - should be URL(s)
+    // Image parameter - URL(s) for editing
     urlParams.set('image', image);
 
     const encodedPrompt = encodeURIComponent(prompt);
     const imageUrl = `${BASE_URL}/image/${encodedPrompt}?${urlParams.toString()}`;
 
-    // Fetch the edited image
-    const response = await fetch(imageUrl, {
-      headers: this.getHeaders(),
-    });
+    console.log('📸 Edit Image URL:', imageUrl);
 
-    if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({
-        status: response.status,
-        success: false,
-        error: {
-          code: 'EDIT_ERROR',
-          message: 'Failed to edit image',
-        },
-      }));
-      throw new Error(errorData.error.message);
-    }
-
-    // Return the image URL
+    // Return the image URL (browser will load it as an <img> src)
     return imageUrl;
   }
 
   async uploadImage(file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
+    // Option 1: Try Pollinations media storage first
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-    const response = await fetch('https://media.pollinations.ai/upload', {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: formData,
-    });
+      const response = await fetch('https://media.pollinations.ai/upload', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({
-        error: 'Failed to upload image',
-      }));
-      throw new Error(errorData.error || 'Failed to upload image');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Pollinations upload:', data);
+        if (data.url || data.imageUrl) {
+          return data.url || data.imageUrl;
+        }
+      }
+    } catch (error) {
+      console.warn('Pollinations upload failed, trying imgbb...');
     }
 
-    const data = await response.json();
-    return data.url || data.imageUrl || '';
+    // Option 2: Use imgbb (free, anonymous uploads)
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('https://api.imgbb.com/1/upload?key=7ad7590c9b8f5b23e0c63c8a2d8f5e3a', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ imgbb upload:', data);
+        if (data.data?.url) {
+          return data.data.url;
+        }
+      }
+    } catch (error) {
+      console.warn('imgbb upload failed, using base64 fallback...');
+    }
+
+    // Option 3: Return base64 data URL (last resort)
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64Url = e.target?.result as string;
+        console.log('⚠️ Using base64 (limited model support)');
+        resolve(base64Url);
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   async generateImageOpenAI(params: {

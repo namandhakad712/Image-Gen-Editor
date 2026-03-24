@@ -436,10 +436,13 @@ export default function SpatialImageEditor() {
       const isEditMode = referenceImages.length > 0;
 
       let imageUrl: string;
-      
+
       if (isEditMode) {
-        // IMAGE EDIT MODE - Uses /v1/images/edits endpoint
-        // Reference images are sent for editing
+        // IMAGE EDIT MODE - Uses GET /image/{prompt} with image parameter
+        console.log('🎨 EDIT MODE');
+        console.log('📷 Reference images:', referenceImages);
+        console.log('📝 Prompt:', fullPrompt);
+        
         imageUrl = await pollinationsAPI.editImage({
           model: selectedModel,
           prompt: fullPrompt,
@@ -453,7 +456,8 @@ export default function SpatialImageEditor() {
           nologo,
           transparent: transparent && (selectedModel.includes('gptimage')),
         });
-        
+
+        console.log('🔗 Edit URL:', imageUrl);
         toast.success('Image edited!');
       } else {
         // TEXT-TO-IMAGE MODE - Uses /image/{prompt} or /v1/images/generations
@@ -585,7 +589,7 @@ export default function SpatialImageEditor() {
       return;
     }
 
-    // Upload each file to Pollinations media storage and get URL
+    // Upload each file and get public URL
     for (const file of filesToUpload) {
       if (!file.type.startsWith('image/')) {
         toast.error('Only images are allowed');
@@ -593,7 +597,9 @@ export default function SpatialImageEditor() {
       }
 
       try {
-        toast.loading('Uploading image...', { id: `upload-${file.name}` });
+        const toastId = `upload-${file.name}`;
+        toast.loading('Uploading image to CDN...', { id: toastId });
+        
         const imageUrl = await pollinationsAPI.uploadImage(file);
         
         if (imageUrl) {
@@ -601,22 +607,14 @@ export default function SpatialImageEditor() {
             if (prev.length >= 4) return prev;
             return [...prev, imageUrl];
           });
-          toast.success('Image uploaded!', { id: `upload-${file.name}` });
+          toast.success('✓ Image ready for editing!', { id: toastId });
+          console.log('✅ Reference image URL:', imageUrl);
         } else {
-          toast.error('Upload failed', { id: `upload-${file.name}` });
+          toast.error('Upload returned no URL', { id: toastId });
         }
       } catch (error) {
         console.error('Upload error:', error);
-        toast.error('Upload failed - using local preview', { id: `upload-${file.name}` });
-        // Fallback: use local FileReader for preview
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setReferenceImages(prev => {
-            if (prev.length >= 4) return prev;
-            return [...prev, event.target?.result as string];
-          });
-        };
-        reader.readAsDataURL(file);
+        toast.error('Upload failed', { id: toastId });
       }
     }
   };
