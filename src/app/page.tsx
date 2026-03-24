@@ -124,6 +124,11 @@ export default function SpatialImageEditor() {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
+  // Image dragging state
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [dragImageId, setDragImageId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
   // Pen drawing state
   const [penStrokes, setPenStrokes] = useState<Array<{
     id: string;
@@ -160,6 +165,53 @@ export default function SpatialImageEditor() {
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>(ART_STYLES[0]);
   const [showStyleSelector, setShowStyleSelector] = useState(false);
   const [styleCategory, setStyleCategory] = useState<string>('All');
+  const [showCustomStyleModal, setShowCustomStyleModal] = useState(false);
+  const [customStyleName, setCustomStyleName] = useState('');
+  const [customStylePrompt, setCustomStylePrompt] = useState('');
+  const [customStyles, setCustomStyles] = useState<ArtStyle[]>([]);
+  
+  // Load custom styles from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('pollinations_custom_styles');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCustomStyles(parsed);
+      } catch (e) {
+        console.error('Failed to load custom styles:', e);
+      }
+    }
+  }, []);
+  
+  // Save custom style
+  const handleSaveCustomStyle = () => {
+    if (!customStyleName.trim() || !customStylePrompt.trim()) {
+      toast.error('Please fill in both fields');
+      return;
+    }
+    const newStyle: ArtStyle = {
+      id: `custom-${Date.now()}`,
+      label: customStyleName.trim(),
+      prompt: customStylePrompt.trim(),
+      negative: '',
+      category: 'Custom',
+    };
+    const updated = [...customStyles, newStyle];
+    setCustomStyles(updated);
+    localStorage.setItem('pollinations_custom_styles', JSON.stringify(updated));
+    setCustomStyleName('');
+    setCustomStylePrompt('');
+    setShowCustomStyleModal(false);
+    toast.success('Custom style saved!');
+  };
+  
+  // Delete custom style
+  const handleDeleteCustomStyle = (styleId: string) => {
+    const updated = customStyles.filter(s => s.id !== styleId);
+    setCustomStyles(updated);
+    localStorage.setItem('pollinations_custom_styles', JSON.stringify(updated));
+    toast.success('Custom style deleted');
+  };
   
   // Batch generation
   const [batchSize, setBatchSize] = useState(1);
@@ -221,21 +273,54 @@ export default function SpatialImageEditor() {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
     }
-    // Deselect when clicking empty canvas
+    // Deselect when clicking empty canvas with pointer tool
     if (activeTool === 'pointer' && e.target === e.currentTarget) {
       setSelectedImageId(null);
     }
   }, [activeTool, pan]);
 
+  // Handle image drag start
+  const handleImageMouseDown = useCallback((e: React.MouseEvent, imageId: string) => {
+    e.stopPropagation();
+    if (activeTool !== 'pointer') return;
+    
+    const img = canvasImages.find(i => i.id === imageId);
+    if (!img) return;
+    
+    // Calculate offset from image corner
+    setDragOffset({
+      x: e.clientX - (img.x * zoom + pan.x),
+      y: e.clientY - (img.y * zoom + pan.y)
+    });
+    setDragImageId(imageId);
+    setIsDraggingImage(true);
+    setSelectedImageId(imageId);
+  }, [activeTool, canvasImages, zoom, pan]);
+
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-  }, [isPanning, panStart]);
+    
+    // Handle image dragging
+    if (isDraggingImage && dragImageId && activeTool === 'pointer') {
+      const newX = (e.clientX - dragOffset.x - pan.x) / zoom;
+      const newY = (e.clientY - dragOffset.y - pan.y) / zoom;
+      
+      setCanvasImages(prev => prev.map(img => 
+        img.id === dragImageId 
+          ? { ...img, x: newX, y: newY }
+          : img
+      ));
+    }
+  }, [isPanning, panStart, isDraggingImage, dragImageId, dragOffset, pan, zoom, activeTool]);
 
   const handleCanvasMouseUp = useCallback(() => {
     setIsPanning(false);
+    setIsDraggingImage(false);
+    setDragImageId(null);
   }, []);
 
   // Zoom with scroll wheel
@@ -807,25 +892,26 @@ export default function SpatialImageEditor() {
           {canvasImages.map((img, index) => (
             <div
               key={img.id}
-              className={`absolute group transition-all duration-300 ${
-                selectedImageId === img.id 
-                  ? 'ring-4 ring-[#EF8354] ring-offset-3 ring-offset-white/30 shadow-2xl shadow-[#EF8354]/20' 
+              className={`absolute group transition-all duration-200 ${
+                selectedImageId === img.id
+                  ? 'ring-4 ring-[#EF8354] ring-offset-2 ring-offset-white/30 shadow-2xl shadow-[#EF8354]/30'
                   : 'hover:ring-2 hover:ring-[#EF8354]/40 hover:shadow-xl'
-              }`}
-              style={{ 
-                left: img.x, 
-                top: img.y, 
-                width: img.width, 
+              } ${activeTool === 'pointer' ? 'cursor-grab' : 'cursor-default'} ${isDraggingImage && dragImageId === img.id ? '!cursor-grabbing' : ''}`}
+              style={{
+                left: img.x,
+                top: img.y,
+                width: img.width,
                 height: img.height,
-                zIndex: selectedImageId === img.id ? 50 : index,
+                zIndex: selectedImageId === img.id ? 100 : index,
               }}
               onClick={(e) => { e.stopPropagation(); if (activeTool === 'pointer') setSelectedImageId(img.id); }}
+              onMouseDown={(e) => handleImageMouseDown(e, img.id)}
             >
-              <img 
-                src={img.url} 
-                alt={img.prompt} 
-                className="w-full h-full object-cover rounded-2xl shadow-lg backdrop-blur-sm" 
-                draggable={false} 
+              <img
+                src={img.url}
+                alt={img.prompt}
+                className="w-full h-full object-cover rounded-2xl shadow-lg backdrop-blur-sm pointer-events-none"
+                draggable={false}
               />
 
               {/* Hover actions - responsive size based on image */}
@@ -1302,40 +1388,6 @@ export default function SpatialImageEditor() {
             </div>
           )}
 
-          {/* Random Prompt & Batch Controls */}
-          <div className="flex items-center gap-2 mb-3">
-            <button
-              onClick={handleRandomPrompt}
-              className="px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-all flex items-center gap-1.5 text-xs font-semibold text-zinc-600"
-            >
-              <Sparkles size={12} />
-              Random Prompt
-            </button>
-
-            <select
-              value={batchSize}
-              onChange={e => setBatchSize(parseInt(e.target.value))}
-              className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-200 text-xs font-semibold text-zinc-600 focus:outline-none"
-            >
-              <option value={1}>1 image</option>
-              <option value={2}>2 images</option>
-              <option value={4}>4 images</option>
-              <option value={6}>6 images</option>
-              <option value={8}>8 images</option>
-            </select>
-
-            {batchSize > 1 && (
-              <button
-                onClick={handleBatchGenerate}
-                disabled={isBatchGenerating}
-                className="px-4 py-1.5 rounded-full bg-[#EF8354] hover:bg-[#e27344] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 text-xs font-bold text-white"
-              >
-                <Sparkles size={12} />
-                Generate All
-              </button>
-            )}
-          </div>
-
           <div className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4">
             <div className="flex-1 relative bg-white/40 md:bg-transparent rounded-2xl md:rounded-none p-3 md:p-0">
               <textarea
@@ -1355,31 +1407,6 @@ export default function SpatialImageEditor() {
               {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
               {isGenerating ? 'Synthesizing...' : 'Generate'}
             </button>
-          </div>
-
-          {/* Modifiers row */}
-          <div className="flex items-center justify-between pt-3 border-t border-zinc-200/50">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar w-full md:w-auto">
-              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide shrink-0">Style:</span>
-              {ALL_MODIFIERS.map(mod => {
-                const isActive = activeModifiers.includes(mod.label);
-                return (
-                  <button key={mod.label} onClick={() => toggleModifier(mod.label)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm whitespace-nowrap transition-all border shrink-0 backdrop-blur-sm
-                      ${isActive ? 'bg-[#EF8354] text-white border-[#EF8354] shadow-md' : 'bg-white/60 text-zinc-600 border-zinc-200 hover:border-[#EF8354]/50 hover:bg-white/80'}`}
-                  >
-                    {isActive && <Check size={10} strokeWidth={3} />}
-                    {mod.label}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setShowStyleModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm whitespace-nowrap transition-all border border-dashed border-zinc-300 shrink-0 hover:border-[#EF8354]/50 hover:bg-[#EF8354]/5"
-              >
-                <Plus size={12} /> Add Style
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -1454,6 +1481,15 @@ export default function SpatialImageEditor() {
               </button>
             </div>
 
+            {/* Add Custom Style Button */}
+            <button
+              onClick={() => { setShowCustomStyleModal(true); setShowStyleSelector(false); }}
+              className="mb-4 p-3 rounded-xl border-2 border-dashed border-zinc-300 hover:border-[#EF8354]/50 hover:bg-[#EF8354]/5 transition-all flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 hover:text-[#EF8354]"
+            >
+              <Plus size={16} />
+              Create Custom Style
+            </button>
+
             {/* Category Filter */}
             <div className="flex gap-2 overflow-x-auto pb-3 mb-2 shrink-0">
               <button
@@ -1462,7 +1498,15 @@ export default function SpatialImageEditor() {
                   styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                 }`}
               >
-                All Styles
+                All
+              </button>
+              <button
+                onClick={() => setStyleCategory('Custom')}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                  styleCategory === 'Custom' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                }`}
+              >
+                Custom
               </button>
               {STYLE_CATEGORIES.map(cat => (
                 <button
@@ -1479,7 +1523,29 @@ export default function SpatialImageEditor() {
 
             {/* Styles Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto flex-1 custom-scrollbar">
-              {ART_STYLES.filter(s => styleCategory === 'All' || s.category === styleCategory).map(style => (
+              {/* Custom Styles */}
+              {styleCategory === 'Custom' && customStyles.map(style => (
+                <div
+                  key={style.id}
+                  className="relative p-4 rounded-2xl border-2 border-zinc-200 bg-white text-left transition-all hover:shadow-lg group"
+                >
+                  <button
+                    onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
+                    className="absolute inset-0 w-full h-full"
+                  />
+                  <div className="text-sm font-bold text-zinc-800 mb-1">{style.label}</div>
+                  <div className="text-[10px] text-zinc-400 truncate">{style.prompt}</div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteCustomStyle(style.id); }}
+                    className="absolute top-2 right-2 p-1 rounded-full bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+              
+              {/* Built-in Styles */}
+              {styleCategory !== 'Custom' && ART_STYLES.filter(s => styleCategory === 'All' || s.category === styleCategory).map(style => (
                 <button
                   key={style.id}
                   onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
@@ -1493,6 +1559,47 @@ export default function SpatialImageEditor() {
                   <div className="text-[10px] text-zinc-400 truncate">{style.prompt || 'No style modifiers'}</div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Style Creation Modal */}
+      {showCustomStyleModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowCustomStyleModal(false)}>
+          <div className="glass-panel rounded-3xl p-6 w-full max-w-md bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-zinc-800">Create Custom Style</h3>
+              <button onClick={() => setShowCustomStyleModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-zinc-600 mb-1 block">Style Name</label>
+                <input
+                  type="text"
+                  value={customStyleName}
+                  onChange={e => setCustomStyleName(e.target.value)}
+                  placeholder="e.g., My Cyberpunk Style"
+                  className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-zinc-600 mb-1 block">Style Prompt</label>
+                <textarea
+                  value={customStylePrompt}
+                  onChange={e => setCustomStylePrompt(e.target.value)}
+                  placeholder="e.g., cyberpunk, neon lights, futuristic city, rain-soaked streets..."
+                  className="w-full h-32 p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+                />
+              </div>
+              <button
+                onClick={handleSaveCustomStyle}
+                className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg"
+              >
+                Save Custom Style
+              </button>
             </div>
           </div>
         </div>
