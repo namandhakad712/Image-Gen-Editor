@@ -157,7 +157,7 @@ export default function SpatialImageEditor() {
   const [steps, setSteps] = useState(30);
   const [activeModifiers, setActiveModifiers] = useState<string[]>([]);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState('nova-fast');
+  const [selectedModel, setSelectedModel] = useState('flux');
   const [penColor, setPenColor] = useState('#EF8354');
   const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
@@ -236,13 +236,15 @@ export default function SpatialImageEditor() {
       .then(res => res.json())
       .then((data: any[]) => {
         console.log('📦 All models from API:', data.length);
+        console.log('Sample model structure:', data[0]);
+        
         // Filter for image models only based on supported_endpoints and output_modalities
         const imageModels = getImageModels(data);
         console.log('✅ Filtered image models:', imageModels.length);
-        console.log('Image model IDs:', imageModels.map(m => m.id));
+        console.log('Image model IDs:', imageModels.map(m => m.id || m.name));
         
         if (imageModels.length > 0) {
-          setModels(imageModels.map(m => ({ value: m.name, label: m.description || m.name || m.id })));
+          setModels(imageModels.map(m => ({ value: m.name || m.id, label: m.description || m.name || m.id })));
         } else {
           console.warn('No image models found, using defaults');
         }
@@ -444,15 +446,15 @@ export default function SpatialImageEditor() {
       let imageUrl: string;
 
       if (isEditMode) {
-        // IMAGE EDIT MODE - Uses GET /image/{prompt} with image parameter
+        // IMAGE EDIT MODE - Uses POST /v1/images/edits with multipart
         console.log('🎨 EDIT MODE');
         console.log('📷 Reference images:', referenceImages);
         console.log('📝 Prompt:', fullPrompt);
-        console.log('🔧 Selected model:', selectedModel);
+        console.log('🔧 Using selected model:', selectedModel);
         
-        // Use the EXACT model selected from dropdown
+        // Use EXACTLY the model user selected from dropdown
         imageUrl = await pollinationsAPI.editImage({
-          model: selectedModel,  // ← YOUR SELECTED MODEL
+          model: selectedModel,  // ← USER'S SELECTED MODEL (no override!)
           prompt: fullPrompt,
           image: referenceImages.join('|'),
           seed: actualSeed,
