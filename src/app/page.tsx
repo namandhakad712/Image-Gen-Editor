@@ -235,10 +235,16 @@ export default function SpatialImageEditor() {
     fetch('https://image.pollinations.ai/models')
       .then(res => res.json())
       .then((data: any[]) => {
+        console.log('📦 All models from API:', data.length);
         // Filter for image models only based on supported_endpoints and output_modalities
         const imageModels = getImageModels(data);
+        console.log('✅ Filtered image models:', imageModels.length);
+        console.log('Image model IDs:', imageModels.map(m => m.id));
+        
         if (imageModels.length > 0) {
           setModels(imageModels.map(m => ({ value: m.name, label: m.description || m.name || m.id })));
+        } else {
+          console.warn('No image models found, using defaults');
         }
       }).catch(err => console.error('Failed to fetch models:', err));
   }, []);
@@ -439,26 +445,14 @@ export default function SpatialImageEditor() {
 
       if (isEditMode) {
         // IMAGE EDIT MODE - Uses GET /image/{prompt} with image parameter
-        // Must use an IMAGE model (not text models like nova-fast)
         console.log('🎨 EDIT MODE');
         console.log('📷 Reference images:', referenceImages);
         console.log('📝 Prompt:', fullPrompt);
+        console.log('🔧 Selected model:', selectedModel);
         
-        // For editing, use a model that supports image input
-        const editModel = selectedModel.includes('gptimage') || 
-                         selectedModel.includes('nanobanana') || 
-                         selectedModel.includes('kontext') ||
-                         selectedModel.includes('seedream') ||
-                         selectedModel.includes('klein') ||
-                         selectedModel.includes('flux') ||
-                         selectedModel.includes('zimage')
-          ? selectedModel 
-          : 'flux'; // Default to flux for editing
-          
-        console.log('🔧 Using edit model:', editModel);
-        
+        // Use the EXACT model selected from dropdown
         imageUrl = await pollinationsAPI.editImage({
-          model: editModel,
+          model: selectedModel,  // ← YOUR SELECTED MODEL
           prompt: fullPrompt,
           image: referenceImages.join('|'),
           seed: actualSeed,

@@ -153,33 +153,31 @@ export class PollinationsAPI {
   async editImage(params: GenerationParams & { image: string }): Promise<string> {
     const { model, prompt, image, seed, enhance, safe, negativePrompt, nologo, transparent, width, height } = params;
 
-    // Use GET /image/{prompt} endpoint with image query parameter for editing
-    // Image can be: public URL, multiple URLs separated by | or ,
-    const urlParams = new URLSearchParams();
-    urlParams.set('model', model || 'flux');
-    urlParams.set('seed', seed.toString());
-    urlParams.set('width', (width || 1024).toString());
-    urlParams.set('height', (height || 1024).toString());
-    
-    if (enhance) urlParams.set('enhance', 'true');
-    if (safe) urlParams.set('safe', 'true');
-    if (negativePrompt) urlParams.set('negative_prompt', negativePrompt);
-    if (nologo) urlParams.set('nologo', 'true');
-    if (transparent) urlParams.set('transparent', 'true');
-    
-    // Image parameter - URL(s) for editing
-    urlParams.set('image', image);
+    console.log('📸 Edit Image - Using POST /v1/images/edits with multipart');
+    console.log('  Model:', model);
+    console.log('  Prompt:', prompt);
+    console.log('  Image URL:', image);
 
-    const encodedPrompt = encodeURIComponent(prompt);
-    const imageUrl = `${BASE_URL}/image/${encodedPrompt}?${urlParams.toString()}`;
+    // Use POST /v1/images/edits endpoint with multipart/form-data
+    // This is the OpenAI-compatible image editing endpoint
+    const formData = new FormData();
+    formData.append('model', model || 'flux');
+    formData.append('prompt', prompt);
+    formData.append('image', image); // Image URL for editing
+    formData.append('seed', seed.toString());
+    if (enhance) formData.append('enhance', 'true');
+    if (safe) formData.append('safe', 'true');
+    if (negativePrompt) formData.append('negative_prompt', negativePrompt);
+    if (nologo) formData.append('nologo', 'true');
+    if (transparent) formData.append('transparent', 'true');
+    formData.append('width', (width || 1024).toString());
+    formData.append('height', (height || 1024).toString());
 
-    console.log('📸 Edit Image URL:', imageUrl);
-
-    // For image editing, we need to fetch the actual image blob and create a blob URL
-    // because the GET endpoint returns the image directly, not a JSON response
     try {
-      const response = await fetch(imageUrl, {
+      const response = await fetch(`${BASE_URL}/v1/images/edits`, {
+        method: 'POST',
         headers: this.getHeaders(),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -187,16 +185,33 @@ export class PollinationsAPI {
         throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Get the image as blob and create object URL
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      console.log('✅ Edit complete, blob URL created:', blobUrl);
+      const data = await response.json();
+      console.log('✅ Edit response:', data);
       
-      return blobUrl;
+      // Get the image URL from response
+      const imageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+      
+      if (imageUrl) {
+        // If it's a blob URL, return it directly
+        if (imageUrl.startsWith('blob:')) {
+          return imageUrl;
+        }
+        // If it's b64_json, create blob URL
+        if (imageUrl.startsWith('data:')) {
+          return imageUrl;
+        }
+        // If it's a URL, fetch and convert to blob
+        const imgResponse = await fetch(imageUrl);
+        const blob = await imgResponse.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        console.log('✅ Edit complete, blob URL:', blobUrl);
+        return blobUrl;
+      }
+      
+      throw new Error('No image in response');
     } catch (error) {
-      console.error('Image edit fetch error:', error);
-      // If fetch fails, return the original URL as fallback
-      return imageUrl;
+      console.error('Image edit error:', error);
+      throw error;
     }
   }
 
