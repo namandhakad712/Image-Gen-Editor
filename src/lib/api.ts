@@ -180,13 +180,19 @@ export class PollinationsAPI {
   }
 
   async uploadImage(file: File): Promise<string> {
-    // Option 1: Try Pollinations media storage
+    // Use Pollinations media storage with API key authentication
     try {
       const formData = new FormData();
       formData.append('file', file);
 
+      const headers: HeadersInit = {};
+      if (this.apiKey) {
+        headers['Authorization'] = `Bearer ${this.apiKey}`;
+      }
+
       const response = await fetch('https://media.pollinations.ai/upload', {
         method: 'POST',
+        headers,
         body: formData,
       });
 
@@ -196,64 +202,20 @@ export class PollinationsAPI {
         if (data.url || data.imageUrl) {
           return data.url || data.imageUrl;
         }
+      } else {
+        const error = await response.json().catch(() => ({}));
+        console.warn('Pollinations upload error:', response.status, error);
       }
     } catch (error) {
-      console.warn('Pollinations upload failed, trying catbox...');
+      console.warn('Pollinations upload failed:', error);
     }
 
-    // Option 2: Use Catbox.moe (free, anonymous, no API key)
-    try {
-      const formData = new FormData();
-      formData.append('fileToUpload', file);
-      formData.append('reqtype', 'fileupload');
-
-      const response = await fetch('https://catbox.moe/user/api.php', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const url = await response.text();
-        console.log('✅ Catbox upload:', url);
-        if (url && url.startsWith('https://')) {
-          return url;
-        }
-      }
-    } catch (error) {
-      console.warn('Catbox upload failed...');
-    }
-
-    // Option 3: Use anonymous file hosting (0x0.st)
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('https://0x0.st', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const url = await response.text();
-        console.log('✅ 0x0.st upload:', url.trim());
-        if (url && url.startsWith('http')) {
-          return url.trim();
-        }
-      }
-    } catch (error) {
-      console.warn('0x0.st upload failed...');
-    }
-
-    // Option 4: Return base64 (last resort - may not work)
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Url = e.target?.result as string;
-        console.log('⚠️ Using base64 (limited support)');
-        resolve(base64Url);
-      };
-      reader.readAsDataURL(file);
-    });
+    // Fallback: For users without API key or if upload fails,
+    // we need to use a different approach
+    // Since Pollinations image editing via GET /image/{prompt} doesn't support base64,
+    // we'll need to inform the user to use a public image URL instead
+    
+    throw new Error('Image upload failed. Please ensure you have an API key set in Settings, or use a public image URL.');
   }
 
   async generateImageOpenAI(params: {

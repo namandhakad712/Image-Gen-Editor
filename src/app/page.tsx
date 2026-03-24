@@ -599,7 +599,7 @@ export default function SpatialImageEditor() {
       const toastId = `upload-${file.name}`;
       
       try {
-        toast.loading('Uploading image to CDN...', { id: toastId });
+        toast.loading('Uploading image to Pollinations CDN...', { id: toastId });
         
         const imageUrl = await pollinationsAPI.uploadImage(file);
         
@@ -608,14 +608,20 @@ export default function SpatialImageEditor() {
             if (prev.length >= 4) return prev;
             return [...prev, imageUrl];
           });
-          toast.success('✓ Image ready for editing!', { id: toastId });
+          toast.success('✓ Image ready for editing!', { id: toastId, duration: 3000 });
           console.log('✅ Reference image URL:', imageUrl);
-        } else {
-          toast.error('Upload returned no URL', { id: toastId });
         }
       } catch (error) {
         console.error('Upload error:', error);
-        toast.error('Upload failed', { id: toastId });
+        toast.error(
+          <div>
+            <p className="font-semibold">Upload failed</p>
+            <p className="text-xs mt-1">
+              Please add your API key in Settings first, or use a public image URL.
+            </p>
+          </div>,
+          { id: toastId, duration: 5000 }
+        );
       }
     }
   };
