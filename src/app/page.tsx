@@ -74,6 +74,8 @@ export default function SpatialImageEditor() {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<'pointer' | 'hand' | 'pen'>('pointer');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showStyleModal, setShowStyleModal] = useState(false);
+  const [customStyle, setCustomStyle] = useState('');
 
   // Generation State
   const [isGenerating, setIsGenerating] = useState(false);
@@ -416,6 +418,15 @@ export default function SpatialImageEditor() {
     });
   };
 
+  const handleAddCustomStyle = () => {
+    if (customStyle.trim()) {
+      setPrompt(prev => prev ? `${prev}, ${customStyle.trim()}` : customStyle.trim());
+      setCustomStyle('');
+      setShowStyleModal(false);
+      toast.success('Style added!');
+    }
+  };
+
   // Undo/Redo for pen strokes
   const undoPenStroke = () => {
     if (penHistoryIndex >= 0) {
@@ -710,7 +721,7 @@ export default function SpatialImageEditor() {
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
-            <span className="hidden sm:inline">Gallery</span>
+            <span className="hidden sm:inline">Menu</span>
           </button>
           <div className="w-px h-4 bg-zinc-200 mx-2"></div>
           <button
@@ -753,6 +764,16 @@ export default function SpatialImageEditor() {
 
       {/* Close menu backdrop */}
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
+
+      {/* Sidebar Toggle Button (when closed) */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="fixed top-1/2 left-4 md:left-6 -translate-y-1/2 z-30 p-3 glass-panel rounded-full shadow-lg hover:scale-110 transition-all backdrop-blur-xl bg-white/80 group"
+        >
+          <ChevronRight size={20} className="text-zinc-600 group-hover:text-[#EF8354] transition-colors" />
+        </button>
+      )}
 
 
       {/* =========================================
@@ -802,18 +823,19 @@ export default function SpatialImageEditor() {
           LEFT PANEL: PARAMETERS SIDEBAR
       ========================================= */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed top-20 bottom-56 md:top-24 md:bottom-40 left-4 md:left-6 w-[300px] md:w-[320px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-5 custom-scrollbar overflow-y-auto transition-transform duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
+      <aside className={`fixed top-20 bottom-56 md:top-24 md:bottom-40 left-4 md:left-6 w-[300px] md:w-[340px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:-translate-x-[120%]'}`}>
 
-        <header className="flex items-center justify-between pb-1 shrink-0">
+        {/* Close button for mobile */}
+        <div className="flex items-center justify-between pb-1 shrink-0">
           <h2 className="text-lg font-bold text-zinc-800">Parameters</h2>
-          <button className="text-zinc-400 hover:text-zinc-600 md:hidden" onClick={() => setIsSidebarOpen(false)}>
-            <ChevronsLeft size={20} />
+          <button className="text-zinc-400 hover:text-zinc-600" onClick={() => setIsSidebarOpen(false)}>
+            <X size={20} />
           </button>
-        </header>
+        </div>
 
         {/* Reference Image */}
         <section className="space-y-3 shrink-0">
@@ -1066,10 +1088,44 @@ export default function SpatialImageEditor() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => setShowStyleModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm whitespace-nowrap transition-all border border-dashed border-zinc-300 shrink-0 hover:border-[#EF8354]/50 hover:bg-[#EF8354]/5"
+              >
+                <Plus size={12} /> Add Style
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Custom Style Modal */}
+      {showStyleModal && (
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowStyleModal(false)}>
+          <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-md bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-zinc-800">Add Custom Style</h3>
+              <button onClick={() => setShowStyleModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                <X size={18} />
+              </button>
+            </div>
+            <textarea
+              value={customStyle}
+              onChange={e => setCustomStyle(e.target.value)}
+              placeholder="Enter style keywords, e.g., 'cyberpunk, neon lights, futuristic city'..."
+              className="w-full h-32 p-4 rounded-2xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none mb-4"
+              autoFocus
+            />
+            <button
+              onClick={handleAddCustomStyle}
+              disabled={!customStyle.trim()}
+              className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all shadow-lg"
+            >
+              Add to Prompt
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

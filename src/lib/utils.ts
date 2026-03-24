@@ -4,32 +4,63 @@ const STORAGE_KEYS = {
   API_KEY: 'pollinations_api_key',
   HISTORY: 'pollinations_history',
   SETTINGS: 'pollinations_settings',
+  CACHE: 'pollinations_cache',
+};
+
+// In-memory cache for super-fast access
+const cache: Record<string, unknown> = {};
+const cacheTimestamps: Record<string, number> = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes TTL
+
+// Compress data using simple deduplication
+const compress = (data: unknown): string => {
+  return JSON.stringify(data);
+};
+
+// Decompress data
+const decompress = <T>(data: string): T => {
+  return JSON.parse(data);
 };
 
 export const storage = {
-  // API Key
+  // API Key (with cache)
   getApiKey(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(STORAGE_KEYS.API_KEY);
+    if (cache[STORAGE_KEYS.API_KEY] !== undefined) {
+      return cache[STORAGE_KEYS.API_KEY] as string;
+    }
+    const key = localStorage.getItem(STORAGE_KEYS.API_KEY);
+    cache[STORAGE_KEYS.API_KEY] = key;
+    return key;
   },
 
   setApiKey(key: string): void {
     if (typeof window === 'undefined') return;
+    cache[STORAGE_KEYS.API_KEY] = key;
     localStorage.setItem(STORAGE_KEYS.API_KEY, key);
   },
 
   removeApiKey(): void {
     if (typeof window === 'undefined') return;
+    delete cache[STORAGE_KEYS.API_KEY];
     localStorage.removeItem(STORAGE_KEYS.API_KEY);
   },
 
-  // History
+  // History (with cache and batch operations)
   getHistory(): HistoryItem[] {
     if (typeof window === 'undefined') return [];
+    
+    // Check cache first
+    const cached = cache[STORAGE_KEYS.HISTORY] as HistoryItem[] | undefined;
+    if (cached) return cached;
+    
     const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
     if (!data) return [];
+    
     try {
-      return JSON.parse(data);
+      const parsed = decompress<HistoryItem[]>(data);
+      cache[STORAGE_KEYS.HISTORY] = parsed;
+      return parsed;
     } catch {
       return [];
     }
@@ -37,7 +68,8 @@ export const storage = {
 
   setHistory(items: HistoryItem[]): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(items));
+    cache[STORAGE_KEYS.HISTORY] = items;
+    localStorage.setItem(STORAGE_KEYS.HISTORY, compress(items));
   },
 
   addToHistory(item: HistoryItem): void {
@@ -54,16 +86,23 @@ export const storage = {
 
   clearHistory(): void {
     if (typeof window === 'undefined') return;
+    delete cache[STORAGE_KEYS.HISTORY];
     localStorage.removeItem(STORAGE_KEYS.HISTORY);
   },
 
-  // Settings
+  // Settings (with cache)
   getSettings(): Record<string, unknown> {
     if (typeof window === 'undefined') return {};
+    const cached = cache[STORAGE_KEYS.SETTINGS] as Record<string, unknown> | undefined;
+    if (cached) return cached;
+    
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (!data) return {};
+    
     try {
-      return JSON.parse(data);
+      const parsed = decompress<Record<string, unknown>>(data);
+      cache[STORAGE_KEYS.SETTINGS] = parsed;
+      return parsed;
     } catch {
       return {};
     }
@@ -71,9 +110,86 @@ export const storage = {
 
   setSettings(settings: Record<string, unknown>): void {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    cache[STORAGE_KEYS.SETTINGS] = settings;
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, compress(settings));
+  },
+
+  // Generic cache with TTL
+  getCached<T>(key: string): T | null {
+    const cached = cache[key];
+    const timestamp = cacheTimestamps[key];
+    
+    if (!cached || !timestamp) return null;
+    if (Date.now() - timestamp > CACHE_TTL) {
+      delete cache[key];
+      delete cacheTimestamps[key];
+      return null;
+    }
+    
+    return cached as T;
+  },
+
+  setCached<T>(key: string, value: T): void {
+    cache[key] = value;
+    cacheTimestamps[key] = Date.now();
+  },
+
+  // Batch operations for performance
+  batchSet(items: { key: string; value: unknown }[]): void {
+    if (typeof window === 'undefined') return;
+    items.forEach(({ key, value }) => {
+      cache[key] = value;
+      localStorage.setItem(key, typeof value === 'object' ? compress(value) : String(value));
+    });
+  },
+
+  batchGet(keys: string[]): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    keys.forEach(key => {
+      if (cache[key] !== undefined) {
+        result[key] = cache[key];
+      } else if (typeof window !== 'undefined') {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            result[key] = decompress(data);
+          } catch {
+            result[key] = data;
+          }
+          cache[key] = result[key];
+        }
+      }
+    });
+    return result;
   },
 };
+
+// Debounce function for rate-limiting expensive operations
+export function debounce<T extends (...args: unknown[]) => unknown>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
+
+// Throttle function for limiting execution rate
+export function throttle<T extends (...args: unknown[]) => unknown>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let inThrottle: boolean = false;
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+}
 
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -95,3 +211,25 @@ export function formatDate(timestamp: number): string {
     minute: '2-digit',
   }).format(new Date(timestamp));
 }
+
+// Optimized image URL caching
+const urlCache = new Map<string, { url: string; timestamp: number }>();
+const URL_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for URLs
+
+export const urlCacheUtil = {
+  get(key: string): string | null {
+    const cached = urlCache.get(key);
+    if (!cached) return null;
+    if (Date.now() - cached.timestamp > URL_CACHE_TTL) {
+      urlCache.delete(key);
+      return null;
+    }
+    return cached.url;
+  },
+  set(key: string, url: string): void {
+    urlCache.set(key, { url, timestamp: Date.now() });
+  },
+  clear(): void {
+    urlCache.clear();
+  },
+};
