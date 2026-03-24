@@ -180,7 +180,7 @@ export class PollinationsAPI {
   }
 
   async uploadImage(file: File): Promise<string> {
-    // Option 1: Try Pollinations media storage first
+    // Option 1: Try Pollinations media storage
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -198,36 +198,58 @@ export class PollinationsAPI {
         }
       }
     } catch (error) {
-      console.warn('Pollinations upload failed, trying imgbb...');
+      console.warn('Pollinations upload failed, trying catbox...');
     }
 
-    // Option 2: Use imgbb (free, anonymous uploads)
+    // Option 2: Use Catbox.moe (free, anonymous, no API key)
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('fileToUpload', file);
+      formData.append('reqtype', 'fileupload');
 
-      const response = await fetch('https://api.imgbb.com/1/upload?key=7ad7590c9b8f5b23e0c63c8a2d8f5e3a', {
+      const response = await fetch('https://catbox.moe/user/api.php', {
         method: 'POST',
         body: formData,
       });
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('✅ imgbb upload:', data);
-        if (data.data?.url) {
-          return data.data.url;
+        const url = await response.text();
+        console.log('✅ Catbox upload:', url);
+        if (url && url.startsWith('https://')) {
+          return url;
         }
       }
     } catch (error) {
-      console.warn('imgbb upload failed, using base64 fallback...');
+      console.warn('Catbox upload failed...');
     }
 
-    // Option 3: Return base64 data URL (last resort)
+    // Option 3: Use anonymous file hosting (0x0.st)
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('https://0x0.st', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const url = await response.text();
+        console.log('✅ 0x0.st upload:', url.trim());
+        if (url && url.startsWith('http')) {
+          return url.trim();
+        }
+      }
+    } catch (error) {
+      console.warn('0x0.st upload failed...');
+    }
+
+    // Option 4: Return base64 (last resort - may not work)
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64Url = e.target?.result as string;
-        console.log('⚠️ Using base64 (limited model support)');
+        console.log('⚠️ Using base64 (limited support)');
         resolve(base64Url);
       };
       reader.readAsDataURL(file);
