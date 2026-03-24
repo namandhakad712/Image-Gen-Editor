@@ -1,125 +1,102 @@
 'use client';
 
-import { useState } from 'react';
-import { Download, Trash2, Eye, Image as ImageIcon, Use } from 'lucide-react';
-import { Button } from './Button';
+import React from 'react';
+import { Download, Trash2, Eye, UseReference } from 'lucide-react';
 import { HistoryItem } from '@/types';
-import { formatDate } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ImageCardProps {
   item: HistoryItem;
-  onDelete?: (id: string) => void;
-  onView?: (item: HistoryItem) => void;
+  onDelete: (id: string) => void;
+  onView: (item: HistoryItem) => void;
   onUseReference?: (url: string) => void;
 }
 
 export function ImageCard({ item, onDelete, onView, onUseReference }: ImageCardProps) {
-  const [isLoading, setIsLoading] = useState(true);
-
-  const handleDownload = async () => {
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const response = await fetch(item.imageUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pollinations-${item.id}.${item.model.includes('video') ? 'mp4' : 'png'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pollinations-${item.prompt.slice(0, 20).replace(/\s+/g, '-')}.png`;
+      link.click();
       window.URL.revokeObjectURL(url);
+      toast.success('Downloaded');
     } catch (error) {
-      console.error('Download failed:', error);
-      // Fallback: open in new tab
-      window.open(item.imageUrl, '_blank');
+      toast.error('Failed to download');
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(item.id);
+  };
+
+  const handleUseReference = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onUseReference) {
+      onUseReference(item.imageUrl);
     }
   };
 
   return (
-    <div className="group relative bg-card rounded-xl overflow-hidden border border-input hover:border-primary/50 transition-all">
-      {/* Image */}
-      <div className="aspect-square relative overflow-hidden bg-secondary/50">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-        {item.model.includes('video') ? (
-          <video
-            src={item.imageUrl}
-            className="w-full h-full object-cover"
-            muted
-            loop
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => e.currentTarget.pause()}
-            onLoad={() => setIsLoading(false)}
-          />
-        ) : (
-          <img
-            src={item.imageUrl}
-            alt={item.prompt}
-            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-            onLoad={() => setIsLoading(false)}
-          />
-        )}
-        
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => onView?.(item)}
-            className="p-2"
-            title="View full size"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
+    <div
+      className="group relative aspect-square rounded-xl overflow-hidden bg-zinc-100 cursor-pointer"
+      onClick={() => onView(item)}
+    >
+      <img
+        src={item.imageUrl}
+        alt={item.prompt}
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+      />
+
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        {/* Top Actions */}
+        <div className="absolute top-2 right-2 flex items-center gap-2">
+          <button
             onClick={handleDownload}
-            className="p-2"
+            className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-zinc-700 hover:text-[#EF8354] hover:scale-110 transition-all"
             title="Download"
           >
-            <Download className="h-4 w-4" />
-          </Button>
-          {onUseReference && !item.model.includes('video') && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onUseReference(item.imageUrl)}
-              className="p-2"
-              title="Use as reference"
-            >
-              <ImageIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => onDelete(item.id)}
-              className="p-2"
-              title="Delete"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+            <Download size={14} />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-2 bg-white/90 backdrop-blur-sm rounded-lg text-zinc-700 hover:text-red-500 hover:scale-110 transition-all"
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
 
-        {/* Model badge */}
-        <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 backdrop-blur-sm rounded text-xs font-medium text-white">
-          {item.model}
+        {/* Bottom Actions */}
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+          <button
+            onClick={() => onView(item)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-lg text-xs font-medium text-zinc-700 hover:bg-white transition-colors"
+          >
+            <Eye size={12} />
+            View
+          </button>
+          {onUseReference && (
+            <button
+              onClick={handleUseReference}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EF8354]/90 backdrop-blur-sm rounded-lg text-xs font-medium text-white hover:bg-[#EF8354] transition-colors"
+            >
+              <UseReference size={12} />
+              Use Ref
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Info */}
-      <div className="p-3">
-        <p className="text-sm text-foreground line-clamp-2 mb-2">{item.prompt}</p>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{formatDate(item.createdAt)}</span>
-          <span>{item.params.width}x{item.params.height}</span>
-        </div>
+      {/* Type Badge */}
+      <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-md text-xs font-medium text-white">
+        {item.type === 'generate' ? '✨' : '🎨'}
       </div>
     </div>
   );

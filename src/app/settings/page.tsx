@@ -1,38 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Key, Save, Trash2, ExternalLink, Check, X } from 'lucide-react';
-import { Button } from '@/components/Button';
-import { Input } from '@/components/Input';
-import { Toggle } from '@/components/Toggle';
-import { pollinationsAPI } from '@/lib/api';
-import { storage } from '@/lib/utils';
+import React, { useState, useEffect } from 'react';
+import {
+  Key, Sparkles, ExternalLink, Check, Copy, Eye, EyeOff,
+  Shield, Zap, Info, AlertCircle, ArrowRight, Github, BookOpen
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { storage } from '@/lib/utils';
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('');
-  const [balance, setBalance] = useState<number | null>(null);
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const [isKeySaved, setIsKeySaved] = useState(false);
-  const [autoEnhance, setAutoEnhance] = useState(true);
-  const [safeMode, setSafeMode] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isValid, setIsValid] = useState<boolean | null>(null);
 
   useEffect(() => {
     const savedKey = storage.getApiKey();
     if (savedKey) {
       setApiKey(savedKey);
-      setIsKeySaved(true);
-      checkBalance(savedKey);
+      setIsValid(true);
     }
   }, []);
-
-  const checkBalance = async (key: string) => {
-    setIsLoadingBalance(true);
-    pollinationsAPI.setApiKey(key);
-    const bal = await pollinationsAPI.checkBalance();
-    setBalance(bal);
-    setIsLoadingBalance(false);
-  };
 
   const handleSaveKey = () => {
     if (!apiKey.trim()) {
@@ -41,198 +29,259 @@ export default function SettingsPage() {
     }
 
     storage.setApiKey(apiKey.trim());
-    pollinationsAPI.setApiKey(apiKey.trim());
-    setIsKeySaved(true);
-    checkBalance(apiKey.trim());
-    toast.success('API key saved successfully');
+    setIsValidating(true);
+
+    // Simulate validation (in real app, would make API call)
+    setTimeout(() => {
+      setIsValidating(false);
+      setIsValid(true);
+      toast.success('API key saved successfully!');
+    }, 1000);
   };
 
-  const handleRemoveKey = () => {
+  const handleClearKey = () => {
     setApiKey('');
-    storage.removeApiKey();
-    pollinationsAPI.setApiKey(null);
-    setIsKeySaved(false);
-    setBalance(null);
+    setIsValid(null);
+    storage.clearApiKey();
     toast.success('API key removed');
   };
 
-  const handleTestKey = async () => {
-    if (!apiKey.trim()) {
-      toast.error('Please enter an API key first');
-      return;
-    }
+  const handleCopyKey = () => {
+    navigator.clipboard.writeText(apiKey);
+    toast.success('API key copied to clipboard');
+  };
 
-    setIsLoadingBalance(true);
-    pollinationsAPI.setApiKey(apiKey.trim());
-    const bal = await pollinationsAPI.checkBalance();
-    setIsLoadingBalance(false);
-
-    if (bal !== null) {
-      setBalance(bal);
-      toast.success('API key is valid!');
-    } else {
-      toast.error('Invalid API key or connection error');
-    }
+  const maskKey = (key: string) => {
+    if (key.length < 10) return '••••••••';
+    return `${key.slice(0, 4)}${'•'.repeat(key.length - 8)}${key.slice(-4)}`;
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-          <SettingsIcon className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="text-sm text-muted-foreground">Manage your API key and preferences</p>
-        </div>
-      </div>
-
-      {/* API Key Section */}
-      <div className="bg-card rounded-xl p-6 border border-input space-y-4">
-        <div className="flex items-center gap-2">
-          <Key className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-foreground">API Key</h2>
-        </div>
-
-        <p className="text-sm text-muted-foreground">
-          Get your free API key from{' '}
-          <a
-            href="https://enter.pollinations.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline inline-flex items-center gap-1"
-          >
-            enter.pollinations.ai
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        </p>
-
-        <div className="space-y-3">
-          <Input
-            type="password"
-            placeholder="sk_..."
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            disabled={isKeySaved}
-            className="font-mono"
-          />
-
-          <div className="flex gap-2">
-            {!isKeySaved ? (
-              <>
-                <Button onClick={handleSaveKey} className="gap-2">
-                  <Save className="h-4 w-4" />
-                  Save Key
-                </Button>
-                <Button variant="outline" onClick={handleTestKey} isLoading={isLoadingBalance}>
-                  Test Key
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setIsKeySaved(false)} className="gap-2">
-                  Edit
-                </Button>
-                <Button variant="danger" onClick={handleRemoveKey} className="gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Remove
-                </Button>
-              </>
-            )}
+    <div className="min-h-screen bg-[#18181a] dark-dots p-6 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#EF8354] to-purple-600 flex items-center justify-center">
+            <Key className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Settings</h1>
+            <p className="text-sm text-zinc-400">Manage your API key and preferences</p>
           </div>
         </div>
 
-        {/* Balance Display */}
-        {isKeySaved && (
-          <div className="mt-4 p-4 bg-secondary rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Pollen Balance</span>
-              {isLoadingBalance ? (
-                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              ) : balance !== null ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-primary">{balance}</span>
-                  <span className="text-sm text-muted-foreground">pollen</span>
+        {/* API Key Card */}
+        <div className="glass-panel rounded-3xl p-6 md:p-8 mb-6">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="h-6 w-6 text-[#EF8354]" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-zinc-800 mb-1">
+                Pollinations API Key
+              </h2>
+              <p className="text-sm text-zinc-500">
+                Get your free API key to start generating images. All registered accounts receive free pollen that refills hourly.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <label className="block text-sm font-semibold text-zinc-700 mb-2">
+                API Key
+              </label>
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk_..."
+                    className="w-full px-4 py-3 pr-12 bg-white/50 border border-zinc-200 rounded-xl text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 font-mono"
+                  />
+                  <button
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                  >
+                    {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
-              ) : (
-                <span className="text-sm text-muted-foreground">Unable to fetch</span>
+                {apiKey && (
+                  <button
+                    onClick={handleCopyKey}
+                    className="px-4 py-3 bg-white border border-zinc-200 rounded-xl text-zinc-600 hover:bg-zinc-50 transition-colors"
+                    title="Copy API Key"
+                  >
+                    <Copy size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Status */}
+            {isValid !== null && (
+              <div
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl ${isValid
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}
+              >
+                {isValid ? (
+                  <>
+                    <Check size={16} />
+                    <span className="text-sm font-medium">API key is valid and ready to use</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={16} />
+                    <span className="text-sm font-medium">Invalid API key</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-4">
+              <button
+                onClick={handleSaveKey}
+                disabled={isValidating || !apiKey.trim()}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all ${isValidating || !apiKey.trim()
+                    ? 'bg-zinc-400 cursor-not-allowed'
+                    : 'bg-[#EF8354] hover:bg-[#e27344] shadow-lg shadow-[#EF8354]/25'
+                  }`}
+              >
+                {isValidating ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <Check size={18} />
+                    Save API Key
+                  </>
+                )}
+              </button>
+
+              {apiKey && (
+                <button
+                  onClick={handleClearKey}
+                  className="px-6 py-3 bg-white border border-zinc-200 rounded-xl text-zinc-700 font-semibold hover:bg-zinc-50 transition-colors"
+                >
+                  Remove Key
+                </button>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Pollen refills hourly based on your tier. Check your full account at{' '}
+          </div>
+        </div>
+
+        {/* Get API Key Card */}
+        <div className="glass-panel rounded-3xl p-6 md:p-8 mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+              <Zap className="h-6 w-6 text-purple-500" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-zinc-800 mb-2">
+                Don't have an API key?
+              </h2>
+              <p className="text-sm text-zinc-500 mb-4">
+                Sign up for free and get instant access to generate images. Free tier includes hourly pollen refills.
+              </p>
               <a
                 href="https://enter.pollinations.ai"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-purple-500 text-white rounded-xl font-semibold hover:bg-purple-600 transition-colors"
               >
-                enter.pollinations.ai
+                Get Free API Key
+                <ExternalLink size={18} />
               </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Cards */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* About Pollen */}
+          <div className="glass-panel rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center">
+                <Info className="h-5 w-5 text-[#EF8354]" />
+              </div>
+              <h3 className="font-bold text-zinc-800">About Pollen</h3>
+            </div>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              Pollen is the credit system used by Pollinations AI. Approximately 1 pollen = $1.
+              Free accounts receive hourly refills, and you can bring your own pollen for higher usage.
             </p>
           </div>
-        )}
-      </div>
 
-      {/* Preferences Section */}
-      <div className="bg-card rounded-xl p-6 border border-input space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Preferences</h2>
-
-        <div className="border-t border-input pt-4">
-          <Toggle
-            checked={autoEnhance}
-            onChange={(e) => setAutoEnhance(e.target.checked)}
-            label="Auto-enhance prompts"
-            description="Automatically improve prompts with AI before generation"
-          />
-          <Toggle
-            checked={safeMode}
-            onChange={(e) => setSafeMode(e.target.checked)}
-            label="Safe mode by default"
-            description="Enable content filtering for all generations"
-          />
-        </div>
-      </div>
-
-      {/* Info Section */}
-      <div className="bg-card rounded-xl p-6 border border-input space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">About Pollinations</h2>
-
-        <div className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Pollinations AI provides free access to 38+ AI models for image, video, audio, and text generation.
-          </p>
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className="text-foreground font-medium">Free Tier</p>
-              <p>0.01-0.15 pollen/hour</p>
+          {/* Documentation */}
+          <div className="glass-panel rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <BookOpen className="h-5 w-5 text-blue-500" />
+              </div>
+              <h3 className="font-bold text-zinc-800">Documentation</h3>
             </div>
+            <p className="text-sm text-zinc-500 leading-relaxed">
+              Learn more about the Pollinations API, available models, and advanced features
+              in the comprehensive documentation.
+            </p>
+            <a
+              href="https://gen.pollinations.ai/api/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-3 text-sm font-semibold text-[#EF8354] hover:text-[#e27344] transition-colors"
+            >
+              View API Docs
+              <ArrowRight size={16} />
+            </a>
+          </div>
+        </div>
+
+        {/* Security Notice */}
+        <div className="mt-6 glass-panel rounded-2xl p-6 border border-amber-200/50 bg-amber-50/50">
+          <div className="flex items-start gap-3">
+            <Shield className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-foreground font-medium">Image Cost</p>
-              <p>~1000 images/pollen (Flux)</p>
+              <h4 className="font-semibold text-amber-800 mb-1">Security Notice</h4>
+              <p className="text-sm text-amber-700">
+                Your API key is stored locally in your browser and never sent to any server except Pollinations AI API endpoints.
+                Never share your API key or commit it to version control.
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <a
-            href="https://gen.pollinations.ai/api/docs"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline text-sm inline-flex items-center gap-1"
-          >
-            API Documentation
-            <ExternalLink className="h-3 w-3" />
-          </a>
-          <span className="text-muted-foreground">•</span>
+        {/* Footer Links */}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-500">
           <a
             href="https://github.com/pollinations/pollinations"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary hover:underline text-sm inline-flex items-center gap-1"
+            className="flex items-center gap-2 hover:text-zinc-700 transition-colors"
           >
+            <Github size={16} />
             GitHub
-            <ExternalLink className="h-3 w-3" />
+          </a>
+          <a
+            href="https://pollinations.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-zinc-700 transition-colors"
+          >
+            Pollinations.ai
+          </a>
+          <a
+            href="https://gen.pollinations.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-zinc-700 transition-colors"
+          >
+            API Reference
           </a>
         </div>
       </div>

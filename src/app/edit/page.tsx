@@ -1,67 +1,182 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Image as ImageIcon, Wand2, Download, Trash2, Eye } from 'lucide-react';
-import { Button } from '@/components/Button';
-import { Textarea } from '@/components/Textarea';
-import { Select } from '@/components/Select';
-import { Slider } from '@/components/Slider';
-import { Toggle } from '@/components/Toggle';
-import { Input } from '@/components/Input';
-import { ImageUpload } from '@/components/ImageUpload';
-import { ImageModal } from '@/components/ImageModal';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  LayoutGrid, Settings, MousePointer2, Hand, PenLine,
+  ImagePlus, ChevronDown, ChevronsLeft, Sparkles, Plus,
+  SlidersHorizontal, Menu, X, Loader2, Upload, Trash2, Check,
+  Wand2, Download, RotateCcw, Eraser, Brush, Circle, Square,
+  Type, Undo2, Redo2, Palette, Layers, ZoomIn, ZoomOut
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
 import { storage, generateId } from '@/lib/utils';
-import { HistoryItem, ImageModel } from '@/types';
-import { toast } from 'sonner';
+import { HistoryItem } from '@/types';
 
-const EDIT_MODELS = [
-  { id: 'flux', name: 'Flux Schnell' },
-  { id: 'kontext', name: 'FLUX.1 Kontext' },
-  { id: 'nanobanana', name: 'NanoBanana' },
-  { id: 'nanobanana-2', name: 'NanoBanana 2' },
-  { id: 'nanobanana-pro', name: 'NanoBanana Pro' },
-  { id: 'gptimage', name: 'GPT Image 1 Mini' },
-  { id: 'gptimage-large', name: 'GPT Image 1.5' },
-  { id: 'klein', name: 'FLUX.2 Klein' },
-  { id: 'p-image-edit', name: 'Pruna Edit' },
-  { id: 'qwen-image', name: 'Qwen Image' },
-  { id: 'nova-canvas', name: 'Amazon Nova Canvas' },
+const ASPECT_RATIOS = [
+  { id: '1:1', label: '1:1', shapeClass: 'shape-1-1' },
+  { id: '4:3', label: '4:3', shapeClass: 'shape-4-3' },
+  { id: '16:9', label: '16:9', shapeClass: 'shape-16-9' },
+  { id: '21:9', label: '21:9', shapeClass: 'shape-21-9' },
+  { id: '3:4', label: '3:4', shapeClass: 'shape-3-4' },
+  { id: '9:16', label: '9:16', shapeClass: 'shape-9-16' }
+];
+
+const DRAWING_TOOLS = [
+  { id: 'brush', icon: Brush, label: 'Brush' },
+  { id: 'pen', icon: PenLine, label: 'Pen' },
+  { id: 'eraser', icon: Eraser, label: 'Eraser' },
+  { id: 'circle', icon: Circle, label: 'Circle' },
+  { id: 'rectangle', icon: Square, label: 'Rectangle' },
+  { id: 'text', icon: Type, label: 'Text' },
+] as const;
+
+const COLORS = [
+  '#EF8354', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+  '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
+  '#FFFFFF', '#000000', '#808080', '#8B4513', '#006400', '#00008B',
 ];
 
 export default function EditPage() {
+  // UI State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<'brush' | 'pen' | 'eraser' | 'circle' | 'rectangle' | 'text'>('brush');
+
+  // Image State
   const [sourceImage, setSourceImage] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('flux');
-  const [models, setModels] = useState<ImageModel[]>([]);
-  const [strength, setStrength] = useState(0.7);
-  const [seed, setSeed] = useState(-1);
-  const [enhance, setEnhance] = useState(true);
-  const [safe, setSafe] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [editedImage, setEditedImage] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [viewingItem, setViewingItem] = useState<HistoryItem | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  useEffect(() => {
-    const apiKey = storage.getApiKey();
-    pollinationsAPI.setApiKey(apiKey);
+  // Edit Parameters
+  const [editPrompt, setEditPrompt] = useState('');
+  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
+  const [editStrength, setEditStrength] = useState(70);
+  const [guidanceScale, setGuidanceScale] = useState(7.5);
+  const [seed, setSeed] = useState(-1);
 
-    pollinationsAPI.getImageModels().then((fetchedModels) => {
-      if (fetchedModels.length > 0) {
-        setModels(fetchedModels);
+  // Drawing State
+  const [brushSize, setBrushSize] = useState(8);
+  const [brushColor, setBrushColor] = useState('#EF8354');
+  const [opacity, setOpacity] = useState(100);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Drawing History
+  const [history, setHistory] = useState<ImageData[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Drawing state
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+  const [shapes, setShapes] = useState<Array<{ type: string; x: number; y: number; width: number; height: number; color: string; strokeWidth: number }>>([]);
+  const [currentShape, setCurrentShape] = useState<{ type: string; x: number; y: number; width: number; height: number; color: string; strokeWidth: number } | null>(null);
+
+  // Handle File Upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setSourceImage(result);
+        setEditedImage(null);
+        setHistory([]);
+        setHistoryIndex(-1);
+        toast.success('Image uploaded successfully');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        setSourceImage(result);
+        toast.success('Image uploaded');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Save canvas state to history
+  const saveToHistory = () => {
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(imageData);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  // Undo
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const canvas = drawingCanvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      setHistoryIndex(historyIndex - 1);
+      ctx.putImageData(history[historyIndex - 1], 0, 0);
+      toast.success('Undo');
+    }
+  };
+
+  // Redo
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const canvas = drawingCanvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      setHistoryIndex(historyIndex + 1);
+      ctx.putImageData(history[historyIndex + 1], 0, 0);
+      toast.success('Redo');
+    }
+  };
+
+  // Clear Drawing
+  const clearDrawing = () => {
+    const canvas = drawingCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        saveToHistory();
+        toast.success('Canvas cleared');
       }
-    });
+    }
+  };
 
-    setHistory(storage.getHistory());
-  }, []);
-
-  const handleEdit = async () => {
+  // Apply AI Edit
+  const handleApplyEdit = async () => {
     if (!sourceImage) {
-      toast.error('Please upload an image to edit');
+      toast.error('Please upload an image first');
       return;
     }
-    if (!prompt.trim()) {
+
+    if (!editPrompt.trim()) {
       toast.error('Please describe the edit you want to make');
       return;
     }
@@ -73,326 +188,583 @@ export default function EditPage() {
     }
 
     pollinationsAPI.setApiKey(apiKey);
-    setIsEditing(true);
+    setIsGenerating(true);
 
     try {
       const actualSeed = seed === -1 ? Math.floor(Math.random() * 1000000) : seed;
 
-      // For image editing, use the OpenAI-compatible endpoint
-      const response = await fetch('https://gen.pollinations.ai/v1/images/edits', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt,
-          image: sourceImage,
-          model: selectedModel,
-          seed: actualSeed,
-          enhance,
-          safe,
-        }),
+      // Get drawing canvas as overlay
+      const canvas = drawingCanvasRef.current;
+      let imageWithDrawing = sourceImage;
+
+      if (canvas && (shapes.length > 0 || history.length > 0)) {
+        // Composite the drawing onto the source image
+        const tempCanvas = document.createElement('canvas');
+        const ctx = tempCanvas.getContext('2d');
+        if (ctx) {
+          const img = new Image();
+          img.src = sourceImage;
+          await new Promise((resolve) => {
+            img.onload = resolve;
+          });
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, img.width, img.height);
+          imageWithDrawing = tempCanvas.toDataURL('image/png');
+        }
+      }
+
+      const imageUrl = await pollinationsAPI.generateImageOpenAI({
+        prompt: editPrompt,
+        model: 'flux-edit',
+        seed: actualSeed,
+        enhance: true,
+        safe: false,
+        image: imageWithDrawing,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || 'Failed to edit image');
-      }
-
-      const data = await response.json();
-      const imageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
-
-      if (!imageUrl) {
-        throw new Error('No image returned from API');
-      }
-
       setEditedImage(imageUrl);
-
-      // Add to history
-      const historyItem: HistoryItem = {
-        id: generateId(),
-        type: 'edit',
-        prompt,
-        model: selectedModel,
-        imageUrl,
-        thumbnailUrl: sourceImage,
-        params: {
-          model: selectedModel,
-          prompt,
-          width: 1024,
-          height: 1024,
-          seed: actualSeed,
-          enhance,
-          safe,
-        },
-        createdAt: Date.now(),
-        referenceImage: sourceImage,
-      };
-
-      const newHistory = [historyItem, ...history].slice(0, 50);
-      setHistory(newHistory);
-      storage.setHistory(newHistory);
-
-      toast.success('Image edited successfully!');
+      toast.success('Edit applied successfully!');
     } catch (error) {
       console.error('Edit error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to edit image');
+      toast.error(error instanceof Error ? error.message : 'Failed to apply edit');
     } finally {
-      setIsEditing(false);
+      setIsGenerating(false);
     }
   };
 
-  const handleDeleteFromHistory = (id: string) => {
-    const newHistory = history.filter((item) => item.id !== id);
-    setHistory(newHistory);
-    storage.setHistory(newHistory);
-    toast.success('Removed from history');
+  // Drawing handlers
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!['brush', 'pen', 'eraser', 'circle', 'rectangle'].includes(activeTool)) return;
+
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
+
+    setLastPos({ x, y });
+
+    if (activeTool === 'circle' || activeTool === 'rectangle') {
+      setCurrentShape({
+        type: activeTool,
+        x,
+        y,
+        width: 0,
+        height: 0,
+        color: brushColor,
+        strokeWidth: brushSize,
+      });
+    } else {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.strokeStyle = activeTool === 'eraser' ? 'rgba(0,0,0,1)' : brushColor;
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = opacity / 100;
+
+        if (activeTool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+        } else {
+          ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      }
+    }
+
+    setIsDrawing(true);
   };
 
-  const handleUseAsSource = (url: string) => {
-    setSourceImage(url);
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
+
+    if (activeTool === 'brush' || activeTool === 'pen' || activeTool === 'eraser') {
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    } else if (activeTool === 'circle' || activeTool === 'rectangle') {
+      if (currentShape) {
+        const width = x - currentShape.x;
+        const height = y - currentShape.y;
+        setCurrentShape({ ...currentShape, width, height });
+      }
+    }
+
+    setLastPos({ x, y });
+  };
+
+  const stopDrawing = () => {
+    if (isDrawing && currentShape) {
+      setShapes([...shapes, currentShape]);
+      setCurrentShape(null);
+      saveToHistory();
+    } else if (isDrawing) {
+      saveToHistory();
+    }
+    setIsDrawing(false);
+  };
+
+  // Download edited image
+  const downloadImage = () => {
+    if (!editedImage && !sourceImage) return;
+
+    const link = document.createElement('a');
+    link.href = editedImage || sourceImage!;
+    link.download = `pollinations-edit-${generateId()}.png`;
+    link.click();
+    toast.success('Image downloaded');
+  };
+
+  // Reset
+  const handleReset = () => {
+    setSourceImage(null);
     setEditedImage(null);
-    toast.success('Image set as source');
+    setEditPrompt('');
+    clearDrawing();
+    toast.success('Reset complete');
+  };
+
+  // Setup canvas
+  useEffect(() => {
+    if (drawingCanvasRef.current && canvasRef.current) {
+      const canvas = drawingCanvasRef.current;
+      canvas.width = 1024;
+      canvas.height = 1024;
+    }
+  }, []);
+
+  const ToolButton = ({ tool }: { tool: typeof DRAWING_TOOLS[0] }) => {
+    const Icon = tool.icon;
+    const isActive = activeTool === tool.id;
+    return (
+      <button
+        onClick={() => setActiveTool(tool.id)}
+        className={`p-3 rounded-xl transition-all ${isActive
+            ? 'bg-[#EF8354] text-white shadow-lg shadow-[#EF8354]/30'
+            : 'bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200'
+          }`}
+        title={tool.label}
+      >
+        <Icon size={18} />
+      </button>
+    );
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
-          <Wand2 className="h-6 w-6 text-white" />
+    <div className="w-full h-[100dvh] bg-[#18181a] dark-dots p-2 md:p-6 lg:p-8 flex items-center justify-center selection:bg-[#EF8354] selection:text-white relative overflow-hidden">
+      <div
+        ref={containerRef}
+        className="w-full h-full max-w-[1600px] rounded-[24px] md:rounded-[32px] overflow-hidden light-grid shadow-2xl ring-1 ring-white/10 relative flex flex-col items-center justify-center"
+      >
+        {/* Top Navigation */}
+        <div className="absolute top-4 left-4 md:top-6 md:left-6 z-40 flex items-center gap-2">
+          <div className="glass-pill rounded-full flex items-center p-1.5 pr-2 md:pr-4 shadow-sm">
+            <button
+              className="md:hidden p-2 rounded-full hover:bg-black/5 text-zinc-700 transition-colors"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+            <div className="hidden md:block w-px h-4 bg-zinc-200 mx-1"></div>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-black/5 text-zinc-700 transition-colors font-medium text-sm"
+            >
+              <Wand2 size={16} />
+              <span className="hidden sm:inline">Generate</span>
+            </button>
+            <div className="w-px h-4 bg-zinc-200 mx-2"></div>
+            <button
+              onClick={() => window.location.href = '/history'}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-black/5 text-zinc-700 transition-colors font-medium text-sm"
+            >
+              <LayoutGrid size={16} />
+              <span className="hidden sm:inline">Gallery</span>
+            </button>
+            <div className="w-px h-4 bg-zinc-200 mx-2"></div>
+            <button
+              onClick={() => window.location.href = '/settings'}
+              className="p-1.5 rounded-full hover:bg-black/5 text-zinc-500 transition-colors"
+            >
+              <Settings size={16} />
+            </button>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Image Editor</h1>
-          <p className="text-sm text-muted-foreground">Transform images with AI</p>
+
+        {/* Right Tools */}
+        <div className="absolute top-4 right-4 md:top-6 md:right-6 z-40">
+          <div className="glass-pill rounded-full flex flex-col items-center p-2 gap-2">
+            <button
+              onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+              className="p-2 rounded-full text-zinc-500 hover:text-black hover:bg-black/5 transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn size={18} />
+            </button>
+            <button
+              onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+              className="p-2 rounded-full text-zinc-500 hover:text-black hover:bg-black/5 transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut size={18} />
+            </button>
+            <div className="w-px h-4 bg-zinc-200"></div>
+            <button
+              onClick={handleUndo}
+              disabled={historyIndex <= 0}
+              className="p-2 rounded-full text-zinc-500 hover:text-black hover:bg-black/5 transition-colors disabled:opacity-30"
+              title="Undo"
+            >
+              <Undo2 size={18} />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyIndex >= history.length - 1}
+              className="p-2 rounded-full text-zinc-500 hover:text-black hover:bg-black/5 transition-colors disabled:opacity-30"
+              title="Redo"
+            >
+              <Redo2 size={18} />
+            </button>
+            <div className="w-px h-4 bg-zinc-200"></div>
+            <button
+              onClick={clearDrawing}
+              className="p-2 rounded-full text-zinc-500 hover:text-red-500 hover:bg-black/5 transition-colors"
+              title="Clear All"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Left Column - Controls */}
-        <div className="space-y-6">
-          {/* Source Image */}
-          <div className="bg-card rounded-xl p-4 border border-input">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Source Image
-            </label>
-            <ImageUpload
-              onImageSelect={setSourceImage}
-              onImageClear={() => setSourceImage(null)}
-              selectedImage={sourceImage}
-              label="Upload image to edit"
-            />
-          </div>
-
-          {/* Edit Prompt */}
-          <div className="bg-card rounded-xl p-4 border border-input">
-            <Textarea
-              label="Edit Instructions"
-              placeholder="Describe how you want to modify the image..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={4}
-              showCount
-              maxLength={2000}
-              helperText="Be specific about the changes you want"
-            />
-
-            {/* Quick suggestions */}
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Quick Suggestions
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  'Make it more vibrant',
-                  'Change to black and white',
-                  'Add a sunset background',
-                  'Make it look like a painting',
-                  'Add snow/winter effect',
-                  'Change the season to autumn',
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => setPrompt(suggestion)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Model Selection */}
-          <div className="bg-card rounded-xl p-4 border border-input">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Edit Model
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {EDIT_MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  onClick={() => setSelectedModel(model.id)}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    selectedModel === model.id
-                      ? 'border-primary bg-accent/50'
-                      : 'border-input bg-card hover:border-primary/50'
-                  }`}
-                >
-                  <span className="text-sm font-medium">{model.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Settings */}
-          <div className="bg-card rounded-xl p-4 border border-input space-y-4">
-            <Slider
-              label="Edit Strength"
-              min={0.1}
-              max={1}
-              step={0.1}
-              value={strength}
-              onChange={(e) => setStrength(parseFloat(e.target.value))}
-              valueLabel={`${Math.round(strength * 100)}%`}
-              helperText="Higher = more changes"
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Seed"
-                type="number"
-                value={seed}
-                onChange={(e) => setSeed(parseInt(e.target.value) || -1)}
-                helperText="-1 for random"
-              />
-            </div>
-
-            <div className="border-t border-input pt-4">
-              <Toggle
-                checked={enhance}
-                onChange={(e) => setEnhance(e.target.checked)}
-                label="AI Prompt Enhance"
-              />
-              <Toggle
-                checked={safe}
-                onChange={(e) => setSafe(e.target.checked)}
-                label="Safe Mode"
-              />
-            </div>
-          </div>
-
-          {/* Edit Button */}
-          <Button
-            onClick={handleEdit}
-            disabled={isEditing || !sourceImage || !prompt.trim()}
-            isLoading={isEditing}
-            className="w-full h-12 text-base"
-            size="lg"
+        {/* Canvas Workspace */}
+        <div className="absolute inset-0 flex items-center justify-center p-4 pt-20 pb-48 md:pb-32 md:pl-[380px] md:pr-24 z-0">
+          <div
+            ref={canvasRef}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className={`relative w-full max-h-full rounded-2xl md:rounded-3xl shadow-2xl transition-all duration-500 ease-in-out flex items-center justify-center overflow-hidden bg-white border-2 border-dashed ${sourceImage ? 'border-transparent' : 'border-zinc-300'
+              }`}
+            style={{
+              aspectRatio: aspectRatio.label as `${number}:${number}`,
+              maxWidth: '100%',
+            }}
           >
-            {isEditing ? (
-              'Editing...'
+            {!sourceImage ? (
+              <div
+                className="flex flex-col items-center justify-center text-zinc-400 p-8 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <div className="w-16 h-16 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] mb-4">
+                  <ImagePlus size={32} />
+                </div>
+                <p className="text-sm font-semibold text-zinc-700">Upload an image to edit</p>
+                <p className="text-xs mt-2 opacity-60">Drag & drop or click to browse</p>
+              </div>
             ) : (
               <>
-                <Wand2 className="h-5 w-5 mr-2" />
-                Apply Edit
-              </>
-            )}
-          </Button>
-        </div>
+                <div
+                  className="w-full h-full"
+                  style={{
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                  }}
+                >
+                  <img
+                    src={editedImage || sourceImage}
+                    alt="Source"
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                  <canvas
+                    ref={drawingCanvasRef}
+                    className="absolute inset-0 w-full h-full touch-none"
+                    style={{ pointerEvents: 'auto' }}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                </div>
 
-        {/* Right Column - Preview & History */}
-        <div className="space-y-6">
-          {/* Result */}
-          <div className="bg-card rounded-xl p-4 border border-input">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Result</h2>
-            
-            {editedImage ? (
-              <div className="space-y-4">
-                {/* Before/After */}
-                <div className="grid grid-cols-2 gap-4">
-                  {sourceImage && (
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Before</p>
-                      <div className="aspect-square rounded-lg overflow-hidden bg-secondary/50">
-                        <img src={sourceImage} alt="Before" className="w-full h-full object-cover" />
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">After</p>
-                    <div className="aspect-square rounded-lg overflow-hidden bg-secondary/50">
-                      <img src={editedImage} alt="After" className="w-full h-full object-cover" />
+                {/* Render shapes overlay */}
+                {shapes.map((shape, i) => (
+                  <div
+                    key={i}
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: shape.x,
+                      top: shape.y,
+                      width: shape.width,
+                      height: shape.height,
+                      border: shape.type === 'rectangle' ? `${shape.strokeWidth}px solid ${shape.color}` : 'none',
+                      borderRadius: shape.type === 'circle' ? '50%' : '0',
+                      backgroundColor: shape.type === 'rectangle' ? 'transparent' : 'transparent',
+                    }}
+                  />
+                ))}
+                {currentShape && (
+                  <div
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: currentShape.x,
+                      top: currentShape.y,
+                      width: currentShape.width,
+                      height: currentShape.height,
+                      border: currentShape.type === 'rectangle' ? `${currentShape.strokeWidth}px solid ${currentShape.color}` : 'none',
+                      borderRadius: currentShape.type === 'circle' ? '50%' : '0',
+                    }}
+                  />
+                )}
+
+                {/* Generating Overlay */}
+                {isGenerating && (
+                  <div className="absolute inset-0 glass-overlay z-30 flex flex-col items-center justify-center">
+                    <div className="scan-line"></div>
+                    <Loader2 className="animate-spin text-[#EF8354] mb-4" size={40} />
+                    <div className="bg-white/80 backdrop-blur-md px-6 py-2 rounded-full shadow-lg border border-white font-semibold text-zinc-700 text-sm animate-pulse">
+                      Applying AI Edit...
                     </div>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="aspect-square rounded-lg bg-secondary/30 border border-input flex flex-col items-center justify-center text-muted-foreground">
-                <ImageIcon className="h-16 w-16 mb-4 opacity-50" />
-                <p>Edited image will appear here</p>
-              </div>
+                )}
+              </>
             )}
           </div>
+        </div>
 
-          {/* Recent Edits */}
-          <div className="bg-card rounded-xl p-4 border border-input">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Recent Edits</h2>
-            {history.filter((h) => h.type === 'edit').length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {history
-                  .filter((h) => h.type === 'edit')
-                  .slice(0, 4)
-                  .map((item) => (
-                    <div key={item.id} className="group relative bg-secondary rounded-lg overflow-hidden border border-input">
-                      <img src={item.imageUrl} alt={item.prompt} className="w-full aspect-square object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setViewingItem(item)}
-                          className="p-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleUseAsSource(item.imageUrl)}
-                          className="p-2"
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleDeleteFromHistory(item.id)}
-                          className="p-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="absolute top-2 left-2 px-2 py-1 bg-black/70 rounded text-xs text-white">
-                        {item.model}
-                      </div>
-                    </div>
-                  ))}
+        {/* Mobile Backdrop */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Left Sidebar */}
+        <aside
+          className={`absolute top-20 bottom-44 md:top-24 md:bottom-24 left-4 md:left-6 w-[320px] md:w-[340px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-6 custom-scrollbar overflow-y-auto transition-transform duration-300 ease-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'
+            }`}
+        >
+          <header className="flex items-center justify-between pb-2 shrink-0">
+            <h2 className="text-lg font-bold text-zinc-800">Edit Tools</h2>
+            <button
+              className="text-zinc-400 hover:text-zinc-600 md:hidden"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <ChevronsLeft size={20} />
+            </button>
+          </header>
+
+          {/* Drawing Tools */}
+          <section className="space-y-3 shrink-0">
+            <label className="text-sm font-semibold text-zinc-700">Drawing Tools</label>
+            <div className="grid grid-cols-3 gap-2">
+              {DRAWING_TOOLS.map((tool) => (
+                <ToolButton key={tool.id} tool={tool} />
+              ))}
+            </div>
+          </section>
+
+          {/* Color Picker */}
+          <section className="space-y-3 shrink-0">
+            <label className="text-sm font-semibold text-zinc-700">Color</label>
+            <div className="flex flex-wrap gap-2">
+              {COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setBrushColor(color)}
+                  className={`w-8 h-8 rounded-lg border-2 transition-all ${brushColor === color ? 'border-zinc-800 scale-110 shadow-md' : 'border-zinc-200 hover:scale-105'
+                    }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+              <input
+                type="color"
+                value={brushColor}
+                onChange={(e) => setBrushColor(e.target.value)}
+                className="w-8 h-8 rounded-lg border-2 border-zinc-200 cursor-pointer"
+              />
+            </div>
+          </section>
+
+          {/* Brush Settings */}
+          <section className="space-y-3 shrink-0">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-semibold text-zinc-700">Brush Size</label>
+              <span className="text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 border border-[#EF8354]/20 px-2 py-1 rounded-md">
+                {brushSize}px
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="50"
+              value={brushSize}
+              onChange={(e) => setBrushSize(parseInt(e.target.value))}
+            />
+
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-semibold text-zinc-700">Opacity</label>
+              <span className="text-xs font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2 py-1 rounded-md">
+                {opacity}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              value={opacity}
+              onChange={(e) => setOpacity(parseInt(e.target.value))}
+            />
+          </section>
+
+          {/* Edit Prompt */}
+          <section className="space-y-3 shrink-0">
+            <label className="text-sm font-semibold text-zinc-700">AI Edit Prompt</label>
+            <textarea
+              className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl p-3 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+              rows={3}
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              placeholder="Describe what you want to change..."
+            />
+          </section>
+
+          {/* Edit Strength */}
+          <section className="space-y-3 shrink-0">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-semibold text-zinc-700">Edit Strength</label>
+              <span className="text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 border border-[#EF8354]/20 px-2 py-1 rounded-md">
+                {editStrength}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={editStrength}
+              onChange={(e) => setEditStrength(parseInt(e.target.value))}
+            />
+          </section>
+
+          {/* Advanced */}
+          <section className="pt-4 border-t border-zinc-200/50 mt-auto shrink-0">
+            <button
+              className="flex items-center justify-between w-full text-zinc-500 hover:text-zinc-800 transition-colors py-2"
+              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+            >
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal size={16} />
+                <span className="text-sm font-semibold">Advanced Settings</span>
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No edits yet</p>
+              <ChevronDown
+                size={16}
+                className={`transition-transform duration-300 ${isAdvancedOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {isAdvancedOpen && (
+              <div className="space-y-4 pb-2 mt-4">
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-xs font-semibold text-zinc-600 shrink-0">Guidance</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={guidanceScale}
+                    onChange={(e) => setGuidanceScale(parseFloat(e.target.value))}
+                    className="flex-1 bg-zinc-100/80 rounded-lg px-3 py-1.5 border border-zinc-200/50 text-xs font-semibold text-zinc-700 focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-xs font-semibold text-zinc-600 shrink-0">Seed</label>
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(parseInt(e.target.value) || -1)}
+                    className="flex-1 bg-zinc-100/80 rounded-lg px-3 py-1.5 border border-zinc-200/50 text-xs font-semibold text-zinc-700 focus:outline-none"
+                  />
+                </div>
               </div>
             )}
+          </section>
+        </aside>
+
+        {/* Bottom Panel */}
+        <div className="absolute bottom-4 md:bottom-6 left-4 right-4 md:left-[380px] md:right-24 glass-panel rounded-[24px] md:rounded-3xl p-3 md:p-5 z-40 flex flex-col gap-3 md:gap-4 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] max-w-4xl mx-auto">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+              >
+                <Upload size={16} />
+                Upload
+              </button>
+              {sourceImage && (
+                <button
+                  onClick={handleReset}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  <RotateCcw size={16} />
+                  Reset
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {(editedImage || sourceImage) && (
+                <button
+                  onClick={downloadImage}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+                >
+                  <Download size={16} />
+                  Save
+                </button>
+              )}
+              <button
+                onClick={handleApplyEdit}
+                disabled={isGenerating || !sourceImage || !editPrompt.trim()}
+                className={`text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 ${isGenerating || !sourceImage || !editPrompt.trim()
+                    ? 'bg-zinc-400 shadow-none cursor-not-allowed'
+                    : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl'
+                  }`}
+              >
+                {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {isGenerating ? 'Applying...' : 'Apply Edit'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Image Modal */}
-      {viewingItem && (
-        <ImageModal item={viewingItem} onClose={() => setViewingItem(null)} />
-      )}
     </div>
   );
 }

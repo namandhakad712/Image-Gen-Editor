@@ -1,11 +1,21 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
 import { Toaster } from 'sonner';
 import { Navigation } from '@/components/Navigation';
-import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Pollinations AI - Image Generator',
-  description: 'Generate stunning images with AI using Pollinations API',
+  title: 'Pollinations AI - Image Generator & Editor',
+  description: 'Create stunning images with AI using Pollinations API. Generate and edit images with 38+ AI models.',
+  keywords: ['AI', 'Image Generation', 'Pollinations', 'AI Art', 'Image Editor'],
+  authors: [{ name: 'namandhakad712' }],
+  openGraph: {
+    title: 'Pollinations AI - Image Generator & Editor',
+    description: 'Create stunning images with AI using Pollinations API',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
@@ -15,20 +25,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background antialiased pb-20 md:pb-0 md:pl-64">
+      <body className={`${inter.className} selection:bg-[#EF8354] selection:text-white`}>
         <Navigation />
-        <main className="container mx-auto px-4 py-6 md:py-8 max-w-7xl">
+        <main className="md:pl-64 min-h-screen">
           {children}
         </main>
         <Toaster
           position="top-right"
           richColors
-          theme="dark"
+          theme="light"
           toastOptions={{
             style: {
-              background: 'hsl(240 10% 5.9%)',
-              color: 'hsl(0 0% 98%)',
-              border: '1px solid hsl(240 4% 16%)',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.9)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
             },
           }}
         />
