@@ -1069,6 +1069,26 @@ export default function SpatialImageEditor() {
           </div>
         </section>
 
+        {/* Art Style */}
+        <section className="space-y-3 shrink-0">
+          <label className="text-sm font-semibold text-zinc-700">Art Style</label>
+          <button
+            onClick={() => setShowStyleSelector(true)}
+            className="w-full p-3 rounded-xl bg-zinc-100/80 border border-zinc-200 text-left text-sm font-semibold text-zinc-700 hover:border-[#EF8354]/50 transition-all flex items-center justify-between"
+          >
+            <span>{selectedStyle.label}</span>
+            <ChevronDown size={16} />
+          </button>
+          {selectedStyle.id !== 'no-style' && (
+            <button
+              onClick={() => setSelectedStyle(ART_STYLES[0])}
+              className="text-xs text-zinc-400 hover:text-red-500 transition-colors flex items-center gap-1"
+            >
+              <X size={12} /> Remove style
+            </button>
+          )}
+        </section>
+
         {/* Sliders */}
         <section className="space-y-5 shrink-0">
           <div className="space-y-2">
@@ -1188,6 +1208,40 @@ export default function SpatialImageEditor() {
             </div>
           )}
 
+          {/* Random Prompt & Batch Controls */}
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={handleRandomPrompt}
+              className="px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-all flex items-center gap-1.5 text-xs font-semibold text-zinc-600"
+            >
+              <Sparkles size={12} />
+              Random Prompt
+            </button>
+
+            <select
+              value={batchSize}
+              onChange={e => setBatchSize(parseInt(e.target.value))}
+              className="px-3 py-1.5 rounded-full bg-zinc-100 border border-zinc-200 text-xs font-semibold text-zinc-600 focus:outline-none"
+            >
+              <option value={1}>1 image</option>
+              <option value={2}>2 images</option>
+              <option value={4}>4 images</option>
+              <option value={6}>6 images</option>
+              <option value={8}>8 images</option>
+            </select>
+
+            {batchSize > 1 && (
+              <button
+                onClick={handleBatchGenerate}
+                disabled={isBatchGenerating}
+                className="px-4 py-1.5 rounded-full bg-[#EF8354] hover:bg-[#e27344] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 text-xs font-bold text-white"
+              >
+                <Sparkles size={12} />
+                Generate All
+              </button>
+            )}
+          </div>
+
           <div className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4">
             <div className="flex-1 relative bg-white/40 md:bg-transparent rounded-2xl md:rounded-none p-3 md:p-0">
               <textarea
@@ -1277,12 +1331,12 @@ export default function SpatialImageEditor() {
                 <X size={20} />
               </button>
             </div>
-            
+
             {/* Comparison Slider */}
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-100">
               <ComparisonSlider leftImage={comparisonImages.left} rightImage={comparisonImages.right} />
             </div>
-            
+
             <div className="flex items-center justify-center gap-4 mt-6">
               <button
                 onClick={() => setComparisonImages(null)}
@@ -1290,6 +1344,61 @@ export default function SpatialImageEditor() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Style Selector Modal */}
+      {showStyleSelector && (
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowStyleSelector(false)}>
+          <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-2xl bg-white/90 backdrop-blur-xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <h3 className="text-xl font-bold text-zinc-800">Select Art Style</h3>
+              <button onClick={() => setShowStyleSelector(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-2 shrink-0">
+              <button
+                onClick={() => setStyleCategory('All')}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                  styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                }`}
+              >
+                All Styles
+              </button>
+              {STYLE_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setStyleCategory(cat)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                    styleCategory === cat ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Styles Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto flex-1 custom-scrollbar">
+              {ART_STYLES.filter(s => styleCategory === 'All' || s.category === styleCategory).map(style => (
+                <button
+                  key={style.id}
+                  onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${
+                    selectedStyle.id === style.id
+                      ? 'border-[#EF8354] bg-[#EF8354]/5'
+                      : 'border-zinc-200 bg-white hover:border-[#EF8354]/50'
+                  }`}
+                >
+                  <div className="text-lg mb-1">{style.label}</div>
+                  <div className="text-[10px] text-zinc-400 truncate">{style.prompt || 'No style modifiers'}</div>
+                </button>
+              ))}
             </div>
           </div>
         </div>

@@ -12,6 +12,42 @@ const cache: Record<string, unknown> = {};
 const cacheTimestamps: Record<string, number> = {};
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes TTL
 
+// Compress history item to minimal size
+const compressHistoryItem = (item: HistoryItem): any => ({
+  id: item.id,
+  t: item.type, // type
+  p: item.prompt, // prompt
+  m: item.model, // model
+  u: item.imageUrl, // imageUrl
+  c: item.createdAt, // createdAt
+  // Only include essential params
+  params: {
+    w: item.params?.width,
+    h: item.params?.height,
+    s: item.params?.seed,
+  }
+});
+
+// Decompress history item
+const decompressHistoryItem = (compressed: any): HistoryItem => ({
+  id: compressed.id,
+  type: compressed.t,
+  prompt: compressed.p,
+  model: compressed.m,
+  imageUrl: compressed.u,
+  createdAt: compressed.c,
+  params: {
+    width: compressed.params?.w || 1024,
+    height: compressed.params?.h || 1024,
+    seed: compressed.params?.s || 0,
+    enhance: false,
+    safe: false,
+    model: compressed.m,
+    prompt: compressed.p,
+  },
+  referenceImage: compressed.r,
+});
+
 // Compress data using simple deduplication
 const compress = (data: unknown): string => {
   return JSON.stringify(data);
@@ -20,6 +56,32 @@ const compress = (data: unknown): string => {
 // Decompress data
 const decompress = <T>(data: string): T => {
   return JSON.parse(data);
+};
+
+// Safe localStorage set with quota handling
+const safeSetLocalStorage = (key: string, value: string): boolean => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    // Quota exceeded - clean up old data
+    console.warn('LocalStorage quota exceeded, cleaning up...');
+    try {
+      // Remove oldest history items
+      const historyData = localStorage.getItem(STORAGE_KEYS.HISTORY);
+      if (historyData) {
+        const history = JSON.parse(historyData);
+        const trimmed = history.slice(0, 20); // Keep only last 20 items
+        localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(trimmed));
+      }
+      // Try again
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+      return false;
+    }
+  }
 };
 
 export const storage = {
@@ -46,7 +108,7 @@ export const storage = {
     localStorage.removeItem(STORAGE_KEYS.API_KEY);
   },
 
-  // History (with cache and batch operations)
+  // History (with compression and cache)
   getHistory(): HistoryItem[] {
     if (typeof window === 'undefined') return [];
     
@@ -69,14 +131,16 @@ export const storage = {
   setHistory(items: HistoryItem[]): void {
     if (typeof window === 'undefined') return;
     cache[STORAGE_KEYS.HISTORY] = items;
-    localStorage.setItem(STORAGE_KEYS.HISTORY, compress(items));
+    // Compress history before saving
+    const compressed = items.map(compressHistoryItem);
+    safeSetLocalStorage(STORAGE_KEYS.HISTORY, JSON.stringify(compressed));
   },
 
   addToHistory(item: HistoryItem): void {
     const history = this.getHistory();
     history.unshift(item);
-    // Keep only last 50 items
-    this.setHistory(history.slice(0, 50));
+    // Keep only last 30 items to prevent quota issues
+    this.setHistory(history.slice(0, 30));
   },
 
   removeFromHistory(id: string): void {
@@ -111,7 +175,7 @@ export const storage = {
   setSettings(settings: Record<string, unknown>): void {
     if (typeof window === 'undefined') return;
     cache[STORAGE_KEYS.SETTINGS] = settings;
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, compress(settings));
+    safeSetLocalStorage(STORAGE_KEYS.SETTINGS, compress(settings));
   },
 
   // Generic cache with TTL
@@ -139,7 +203,7 @@ export const storage = {
     if (typeof window === 'undefined') return;
     items.forEach(({ key, value }) => {
       cache[key] = value;
-      localStorage.setItem(key, typeof value === 'object' ? compress(value) : String(value));
+      safeSetLocalStorage(key, typeof value === 'object' ? compress(value) : String(value));
     });
   },
 
