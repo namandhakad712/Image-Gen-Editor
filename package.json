@@ -1,6 +1,6 @@
 {
-  "name": "pollinations-app",
-  "version": "0.1.0",
+  "name": "image-gen-editor",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -28,8 +28,5 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.5"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }

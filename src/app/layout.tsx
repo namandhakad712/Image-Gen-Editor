@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
 
-const inter = Inter({ subsets: ['latin'] });
-
 export const metadata: Metadata = {
-  title: 'Pollinations AI - Infinite Canvas Image Generator',
-  description: 'Create stunning images with AI on an infinite canvas. Generate and edit images with 38+ AI models.',
+  title: 'Image Gen Editor — AI Image Generator & Editor',
+  description: 'Create and edit stunning AI images with a beautiful spatial canvas. Powered by Pollinations AI with 8+ models including Flux, GPT Image, NanoBanana, and more.',
+  keywords: 'AI image generator, image editor, Pollinations AI, Flux, GPT Image, text to image, AI art',
+  openGraph: {
+    title: 'Image Gen Editor — AI Image Generator & Editor',
+    description: 'Create and edit stunning AI images with a beautiful spatial canvas. Powered by Pollinations AI.',
+    url: 'https://image-gen-editor.vercel.app',
+    siteName: 'Image Gen Editor',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
@@ -17,18 +22,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} selection:bg-[#EF8354] selection:text-white`}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      </head>
+      <body className="selection:bg-[#EF8354] selection:text-white">
         {children}
         <Toaster
           position="bottom-center"
           richColors
-          theme="dark"
+          theme="light"
           toastOptions={{
             style: {
-              background: 'rgba(20, 20, 30, 0.95)',
+              background: 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#fff',
+              border: '1px solid rgba(255, 255, 255, 0.9)',
+              color: '#3f3f46',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+              borderRadius: '16px',
             },
           }}
         />

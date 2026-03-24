@@ -2,100 +2,199 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Sparkles, Download, Share2, Maximize2, ZoomIn, ZoomOut,
-  Wand2, ImagePlus, History, Settings, Trash2, X, ChevronDown,
-  MousePointer2, Hand, PenLine, Grid3x3, Layers, Palette,
-  Undo2, Redo2, RotateCcw, Check, Loader2, Eye, EyeOff,
-  Copy, ExternalLink, MonitorPlay, Square, Circle
+  LayoutGrid, Settings, MousePointer2, Hand, PenLine,
+  ImagePlus, ChevronDown, ChevronsLeft, Sparkles, Plus,
+  SlidersHorizontal, Menu, X, Loader2, Trash2, Check,
+  Eye, EyeOff, Download, LogIn, Key, ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
-import { storage, generateId } from '@/lib/utils';
+import { storage, generateId, formatDate } from '@/lib/utils';
 import { HistoryItem, GenerationParams } from '@/types';
 
+// =============================================
+//  CONSTANTS (matching ui-design.tsx exactly)
+// =============================================
+
 const ASPECT_RATIOS = [
-  { id: '1:1', label: '1:1', width: 1024, height: 1024 },
-  { id: '4:3', label: '4:3', width: 1024, height: 768 },
-  { id: '16:9', label: '16:9', width: 1280, height: 720 },
-  { id: '21:9', label: '21:9', width: 1512, height: 648 },
-  { id: '3:4', label: '3:4', width: 768, height: 1024 },
-  { id: '9:16', label: '9:16', width: 720, height: 1280 }
+  { id: '1:1', label: '1:1', shapeClass: 'shape-1-1', cssRatio: '1/1', width: 1024, height: 1024 },
+  { id: '4:3', label: '4:3', shapeClass: 'shape-4-3', cssRatio: '4/3', width: 1024, height: 768 },
+  { id: '16:9', label: '16:9', shapeClass: 'shape-16-9', cssRatio: '16/9', width: 1280, height: 720 },
+  { id: '21:9', label: '21:9', shapeClass: 'shape-21-9', cssRatio: '21/9', width: 1512, height: 648 },
+  { id: '3:4', label: '3:4', shapeClass: 'shape-3-4', cssRatio: '3/4', width: 768, height: 1024 },
+  { id: '9:16', label: '9:16', shapeClass: 'shape-9-16', cssRatio: '9/16', width: 720, height: 1280 },
 ];
 
 const ALL_MODIFIERS = [
   'High Resolution', 'Studio Lighting', 'Minimalist', 'Cinematic',
-  'Octane Render', 'Volumetric', 'Macro', 'Dramatic', 'Soft Focus',
-  'HDR', 'Bokeh', 'Golden Hour'
+  'Octane Render', 'Volumetric', 'Macro',
 ];
 
-const PRESET_STYLES = [
-  { name: 'None', prompt: '' },
-  { name: 'Cinematic', prompt: 'cinematic lighting, dramatic, film grain, color graded' },
-  { name: 'Anime', prompt: 'anime style, studio ghibli, vibrant colors' },
-  { name: 'Photorealistic', prompt: 'photorealistic, ultra detailed, 8k, professional photography' },
-  { name: 'Digital Art', prompt: 'digital art, artstation, concept art, illustration' },
-  { name: 'Cyberpunk', prompt: 'cyberpunk, neon lights, futuristic, high tech' },
-  { name: 'Fantasy', prompt: 'fantasy art, magical, ethereal, glowing, mystical' },
-  { name: 'Minimalist', prompt: 'minimalist, clean, simple, geometric, modern' },
+const MODELS = [
+  { value: 'flux', label: 'Flux Schnell' },
+  { value: 'zimage', label: 'Z-Image Turbo' },
+  { value: 'gptimage', label: 'GPT Image 1 Mini' },
+  { value: 'nanobanana', label: 'NanoBanana' },
+  { value: 'klein', label: 'FLUX.2 Klein 4B' },
+  { value: 'kontext', label: 'FLUX.1 Kontext' },
+  { value: 'gptimage-large', label: 'GPT Image 1.5' },
+  { value: 'seedream5', label: 'Seedream 5.0 Lite' },
 ];
 
-const COLORS = [
-  '#EF8354', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
-  '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE',
-  '#FFFFFF', '#000000',
-];
+// BYOP App URL for redirect auth
+const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin : 'https://image-gen-editor.vercel.app';
+const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
 
-export default function GeneratePage() {
-  // UI State
-  const [showPanel, setShowPanel] = useState<'none' | 'generate' | 'edit' | 'settings' | 'history'>('generate');
-  const [activeTool, setActiveTool] = useState<'pointer' | 'pan' | 'draw'>('pointer');
+// =============================================
+//  MAIN COMPONENT  — EXACT UI from ui-design.tsx
+// =============================================
+
+export default function SpatialImageEditor() {
+  // Mobile / UI State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<'pointer' | 'hand' | 'pen'>('pointer');
+  const [showOverlay, setShowOverlay] = useState<'none' | 'gallery' | 'settings'>('none');
 
   // Generation State
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<Array<{ id: string; url: string; x: number; y: number; width: number; height: number }>>([]);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
-  const [negativePrompt, setNegativePrompt] = useState('');
 
   // Parameters
-  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
+  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[2]); // Default 16:9
   const [styleStrength, setStyleStrength] = useState(75);
   const [guidanceScale, setGuidanceScale] = useState(7.5);
   const [seed, setSeed] = useState(-1);
-  const [activeModifiers, setActiveModifiers] = useState<string[]>(['High Resolution']);
+  const [steps, setSteps] = useState(30);
+  const [activeModifiers, setActiveModifiers] = useState<string[]>(['High Resolution', 'Studio Lighting', 'Minimalist']);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState('flux');
-  const [selectedPreset, setSelectedPreset] = useState('');
-
-  // Canvas State
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-
-  // Drawing State
-  const [brushSize, setBrushSize] = useState(4);
-  const [brushColor, setBrushColor] = useState('#EF8354');
-  const [drawingData, setDrawingData] = useState<Record<string, Array<{ x: number; y: number; color: string; size: number }>>>({});
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [enhance, setEnhance] = useState(true);
+  const [safe, setSafe] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Apply preset style
-  const applyPreset = (presetName: string) => {
-    const preset = PRESET_STYLES.find((p) => p.name === presetName);
-    if (preset) {
-      if (preset.prompt && !prompt.includes(preset.prompt)) {
-        setPrompt((prev) => (prev ? `${prev}, ${preset.prompt}` : preset.prompt));
+  // =============================================
+  //  BYOP: Grab API key from URL hash on redirect
+  // =============================================
+  useEffect(() => {
+    // Check if we received an API key from BYOP redirect
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      const apiKey = hashParams.get('api_key');
+      if (apiKey) {
+        storage.setApiKey(apiKey);
+        setHasApiKey(true);
+        pollinationsAPI.setApiKey(apiKey);
+        toast.success('Connected! API key received via Pollinations');
+        // Clean the hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
       }
-      setSelectedPreset(presetName);
+    }
+    // Also check localStorage
+    const savedKey = storage.getApiKey();
+    if (savedKey) {
+      setHasApiKey(true);
+      pollinationsAPI.setApiKey(savedKey);
+    }
+  }, []);
+
+  // =============================================
+  //  HANDLERS
+  // =============================================
+
+  // BYOP redirect auth
+  const handleBYOPAuth = () => {
+    const params = new URLSearchParams({
+      redirect_url: APP_REDIRECT_URL,
+    });
+    window.location.href = `${BYOP_AUTH_URL}?${params}`;
+  };
+
+  // Generate Image via Pollinations API
+  const handleGenerate = async () => {
+    if (isGenerating) return;
+    if (!prompt.trim()) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+
+    if (!hasApiKey) {
+      toast.error('Please connect your Pollinations account or add an API key');
+      setShowOverlay('settings');
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      const actualSeed = seed === -1 ? Math.floor(Math.random() * 999999999) : seed;
+      const fullPrompt = activeModifiers.length > 0
+        ? `${prompt}, ${activeModifiers.join(', ')}`
+        : prompt;
+
+      const params: GenerationParams = {
+        model: selectedModel,
+        prompt: fullPrompt,
+        width: aspectRatio.width,
+        height: aspectRatio.height,
+        seed: actualSeed,
+        enhance,
+        safe,
+        quality: 'high' as const,
+        image: referenceImage || undefined,
+      };
+
+      let imageUrl: string;
+
+      if (referenceImage) {
+        // Use OpenAI-compatible endpoint for image-to-image
+        imageUrl = await pollinationsAPI.generateImageOpenAI({
+          prompt: fullPrompt,
+          model: selectedModel,
+          seed: actualSeed,
+          enhance,
+          safe,
+        });
+      } else {
+        imageUrl = await pollinationsAPI.generateImage(params);
+      }
+
+      setCurrentImageUrl(imageUrl);
+      setSeed(actualSeed);
+
+      // Save to history (stored in localStorage)
+      const historyItem: HistoryItem = {
+        id: generateId(),
+        type: 'generate',
+        prompt: fullPrompt,
+        model: selectedModel,
+        imageUrl,
+        params,
+        createdAt: Date.now(),
+        referenceImage: referenceImage || undefined,
+      };
+
+      const history = storage.getHistory();
+      storage.setHistory([historyItem, ...history].slice(0, 50));
+
+      toast.success('Image generated!');
+      setReferenceImage(null);
+
+      if (window.innerWidth < 768) setIsSidebarOpen(false);
+    } catch (error) {
+      console.error('Generation error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate image');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  // Handle File Upload
+  // Handle File Upload for Reference Image
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -111,604 +210,655 @@ export default function GeneratePage() {
 
   // Toggle Modifiers
   const toggleModifier = (mod: string) => {
-    setActiveModifiers((prev) =>
-      prev.includes(mod) ? prev.filter((m) => m !== mod) : [...prev, mod]
+    setActiveModifiers(prev =>
+      prev.includes(mod) ? prev.filter(m => m !== mod) : [...prev, mod]
     );
   };
 
-  // Generate Image
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      toast.error('Please enter a prompt');
-      return;
-    }
-
-    const apiKey = storage.getApiKey();
-    if (!apiKey) {
-      toast.error('Please add your API key in settings');
-      setShowPanel('settings');
-      return;
-    }
-
-    pollinationsAPI.setApiKey(apiKey);
-    setIsGenerating(true);
-
+  // Download current image
+  const downloadImage = async () => {
+    if (!currentImageUrl) return;
     try {
-      const actualSeed = seed === -1 ? Math.floor(Math.random() * 1000000) : seed;
-      const fullPrompt = activeModifiers.length > 0
-        ? `${prompt}, ${activeModifiers.join(', ')}`
-        : prompt;
-
-      const params: GenerationParams = {
-        model: selectedModel,
-        prompt: fullPrompt,
-        negativePrompt: negativePrompt || undefined,
-        width: aspectRatio.width,
-        height: aspectRatio.height,
-        seed: actualSeed,
-        enhance: true,
-        safe: false,
-        quality: 'high' as const,
-        image: referenceImage || undefined,
-      };
-
-      let imageUrl: string;
-
-      if (referenceImage) {
-        imageUrl = await pollinationsAPI.generateImageOpenAI({
-          prompt: fullPrompt,
-          model: selectedModel,
-          seed: actualSeed,
-          enhance: true,
-          safe: false,
-        });
-      } else {
-        imageUrl = await pollinationsAPI.generateImage(params);
-      }
-
-      // Add image to canvas at center of view
-      const newImage = {
-        id: generateId(),
-        url: imageUrl,
-        x: -pan.x + (window.innerWidth / 2 - aspectRatio.width / 2) / zoom,
-        y: -pan.y + (window.innerHeight / 2 - aspectRatio.height / 2) / zoom,
-        width: aspectRatio.width,
-        height: aspectRatio.height,
-      };
-
-      setGeneratedImages((prev) => [...prev, newImage]);
-
-      // Add to history
-      const historyItem: HistoryItem = {
-        id: generateId(),
-        type: 'generate',
-        prompt: fullPrompt,
-        model: selectedModel,
-        imageUrl,
-        params,
-        createdAt: Date.now(),
-        referenceImage: referenceImage || undefined,
-      };
-
-      const history = storage.getHistory();
-      const newHistory = [historyItem, ...history].slice(0, 50);
-      storage.setHistory(newHistory);
-
-      toast.success('Image generated!');
-      setReferenceImage(null);
-    } catch (error) {
-      console.error('Generation error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to generate image');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Canvas Pan Handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (activeTool === 'pan' || e.button === 1) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsPanning(false);
-  };
-
-  const handleWheel = useCallback((e: WheelEvent) => {
-    if (e.ctrlKey || activeTool === 'pan') {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setZoom((prev) => Math.max(0.1, Math.min(5, prev + delta)));
-    }
-  }, [activeTool]);
-
-  useEffect(() => {
-    const container = canvasContainerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-      return () => container.removeEventListener('wheel', handleWheel);
-    }
-  }, [handleWheel]);
-
-  // Download image
-  const downloadImage = async (imageUrl: string, id: string) => {
-    try {
-      const response = await fetch(imageUrl);
+      const response = await fetch(currentImageUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `pollinations-${id.slice(0, 8)}.png`;
+      link.download = `image-gen-${Date.now()}.png`;
       link.click();
       window.URL.revokeObjectURL(url);
-      toast.success('Image downloaded');
-    } catch (error) {
+      toast.success('Image downloaded!');
+    } catch {
       toast.error('Failed to download');
     }
   };
 
-  // Delete image
-  const deleteImage = (id: string) => {
-    setGeneratedImages((prev) => prev.filter((img) => img.id !== id));
-    if (selectedImageId === id) setSelectedImageId(null);
-    toast.success('Image removed');
+  // Load from gallery
+  const loadFromGallery = (item: HistoryItem) => {
+    setCurrentImageUrl(item.imageUrl);
+    setShowOverlay('none');
+    toast.success('Loaded from gallery');
   };
 
-  // Clear all images
-  const clearAllImages = () => {
-    if (confirm('Remove all images from canvas?')) {
-      setGeneratedImages([]);
-      setSelectedImageId(null);
-      toast.success('Canvas cleared');
-    }
-  };
+  // =============================================
+  //  DRAWING LOGIC (pen tool on canvas overlay)
+  // =============================================
+  useEffect(() => {
+    if (activeTool !== 'pen' || !drawingCanvasRef.current) return;
 
-  // Reset view
-  const resetView = () => {
-    setPan({ x: 0, y: 0 });
-    setZoom(1);
-    toast.success('View reset');
-  };
+    const canvas = drawingCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    let isDrawing = false;
 
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    ctx.strokeStyle = '#EF8354';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+
+    const getCoords = (e: MouseEvent | TouchEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = 'touches' in e ? e.touches[0]?.clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
+      return { x: (clientX || 0) - rect.left, y: (clientY || 0) - rect.top };
+    };
+
+    const startDrawing = (e: MouseEvent | TouchEvent) => {
+      isDrawing = true;
+      const { x, y } = getCoords(e);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+    const stopDrawing = () => {
+      isDrawing = false;
+      ctx.beginPath();
+    };
+    const draw = (e: MouseEvent | TouchEvent) => {
+      if (!isDrawing) return;
+      const { x, y } = getCoords(e);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    canvas.addEventListener('touchstart', startDrawing);
+    canvas.addEventListener('touchmove', draw);
+    canvas.addEventListener('touchend', stopDrawing);
+
+    return () => {
+      canvas.removeEventListener('mousedown', startDrawing);
+      canvas.removeEventListener('mousemove', draw);
+      canvas.removeEventListener('mouseup', stopDrawing);
+      canvas.removeEventListener('mouseout', stopDrawing);
+      canvas.removeEventListener('touchstart', startDrawing);
+      canvas.removeEventListener('touchmove', draw);
+      canvas.removeEventListener('touchend', stopDrawing);
+    };
+  }, [activeTool, currentImageUrl, aspectRatio]);
+
+  // =============================================
+  //  RENDER  — Exact replica of ui-design.tsx
+  // =============================================
   return (
-    <div className="w-full h-screen bg-[#0a0a0f] overflow-hidden relative">
-      {/* Top Toolbar */}
-      <div className="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/10">
-        <div className="flex items-center justify-between px-4 py-3">
-          {/* Left - Logo & Nav */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#EF8354] to-purple-600 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-lg font-bold text-white">Pollinations</span>
-            </div>
+    <div className="w-full h-[100dvh] bg-[#18181a] dark-dots p-2 md:p-6 lg:p-8 flex items-center justify-center selection:bg-[#EF8354] selection:text-white relative">
 
-            <div className="h-6 w-px bg-white/20" />
+      {/* Outer Browser/App Window Shell */}
+      <div className="w-full h-full max-w-[1600px] rounded-[24px] md:rounded-[32px] overflow-hidden light-grid shadow-2xl ring-1 ring-white/10 relative flex flex-col items-center justify-center">
 
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setShowPanel(showPanel === 'generate' ? 'none' : 'generate')}
-                className={`toolbar-btn ${showPanel === 'generate' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-              >
-                <Wand2 size={18} />
-                Generate
-              </button>
-              <button
-                onClick={() => setShowPanel(showPanel === 'history' ? 'none' : 'history')}
-                className={`toolbar-btn ${showPanel === 'history' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-              >
-                <Grid3x3 size={18} />
-                Gallery
-              </button>
-              <button
-                onClick={() => window.location.href = '/edit'}
-                className="toolbar-btn text-zinc-400 hover:text-white hover:bg-white/5"
-              >
-                <ImagePlus size={18} />
-                Edit
-              </button>
-              <button
-                onClick={() => setShowPanel(showPanel === 'settings' ? 'none' : 'settings')}
-                className={`toolbar-btn ${showPanel === 'settings' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/5'}`}
-              >
-                <Settings size={18} />
-              </button>
-            </div>
-          </div>
-
-          {/* Center - Zoom Controls */}
-          <div className="flex items-center gap-2 glass-panel rounded-xl p-1">
+        {/* =========================================
+            TOP NAVIGATION LAYER
+        ========================================= */}
+        <div className="absolute top-4 left-4 md:top-6 md:left-6 z-40 flex items-center gap-2">
+          <div className="glass-pill rounded-full flex items-center p-1.5 pr-2 md:pr-4 shadow-sm">
             <button
-              onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="md:hidden p-2 rounded-full hover:bg-black/5 text-zinc-700 transition-colors"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             >
-              <ZoomOut size={16} />
+              {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <span className="text-sm text-zinc-400 w-14 text-center">{Math.round(zoom * 100)}%</span>
+            <div className="hidden md:block w-px h-4 bg-zinc-200 mx-1"></div>
             <button
-              onClick={() => setZoom((z) => Math.min(5, z + 0.25))}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+              onClick={() => setShowOverlay(showOverlay === 'gallery' ? 'none' : 'gallery')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${showOverlay === 'gallery' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
             >
-              <ZoomIn size={16} />
+              <LayoutGrid size={16} />
+              <span className="hidden sm:inline">Gallery</span>
             </button>
-            <div className="w-px h-4 bg-white/20 mx-1" />
+            <div className="w-px h-4 bg-zinc-200 mx-2"></div>
             <button
-              onClick={resetView}
-              className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
-              title="Reset View"
+              onClick={() => setShowOverlay(showOverlay === 'settings' ? 'none' : 'settings')}
+              className={`p-1.5 rounded-full transition-colors ${showOverlay === 'settings' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:bg-black/5'}`}
             >
-              <RotateCcw size={16} />
-            </button>
-          </div>
-
-          {/* Right - Tools & Actions */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 glass-panel rounded-xl p-1">
-              <button
-                onClick={() => setActiveTool('pointer')}
-                className={`p-2 rounded-lg transition-colors ${activeTool === 'pointer' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-                title="Select Tool"
-              >
-                <MousePointer2 size={16} />
-              </button>
-              <button
-                onClick={() => setActiveTool('pan')}
-                className={`p-2 rounded-lg transition-colors ${activeTool === 'pan' ? 'bg-[#EF8354] text-white' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-                title="Pan Tool (Middle Click)"
-              >
-                <Hand size={16} />
-              </button>
-            </div>
-
-            <button
-              onClick={clearAllImages}
-              className="toolbar-btn text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            >
-              <Trash2 size={18} />
-              Clear All
+              <Settings size={16} />
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Infinite Canvas */}
-      <div
-        ref={canvasContainerRef}
-        className={`infinite-canvas pt-16 ${activeTool === 'pan' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      >
-        <div
-          className="absolute inset-0 origin-top-left"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          }}
-        >
-          {/* Generated Images */}
-          {generatedImages.map((img) => (
-            <div
-              key={img.id}
-              className={`absolute group ${selectedImageId === img.id ? 'ring-2 ring-[#EF8354]' : ''}`}
-              style={{
-                left: img.x,
-                top: img.y,
-                width: img.width,
-                height: img.height,
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedImageId(img.id);
-              }}
+        {/* Floating Right Tools */}
+        <div className="absolute top-4 right-4 md:top-6 md:right-6 z-40">
+          <div className="glass-pill rounded-full flex flex-row md:flex-col items-center p-1.5 md:p-2 gap-1 md:gap-2">
+            <button
+              onClick={() => setActiveTool('pointer')}
+              className={`p-2 rounded-full transition-colors ${activeTool === 'pointer' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
             >
-              <img
-                src={img.url}
-                alt="Generated"
-                className="w-full h-full object-cover rounded-lg shadow-2xl"
-                draggable={false}
-              />
-
-              {/* Image Actions */}
-              <div className="absolute -top-10 right-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <MousePointer2 size={18} />
+            </button>
+            <button
+              onClick={() => setActiveTool('hand')}
+              className={`p-2 rounded-full transition-colors ${activeTool === 'hand' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
+            >
+              <Hand size={18} />
+            </button>
+            <button
+              onClick={() => setActiveTool('pen')}
+              className={`p-2 rounded-full transition-colors ${activeTool === 'pen' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
+            >
+              <PenLine size={18} />
+            </button>
+            {currentImageUrl && (
+              <>
+                <div className="w-6 h-px md:w-px md:h-6 bg-zinc-200"></div>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    downloadImage(img.url, img.id);
-                  }}
-                  className="p-2 glass-panel rounded-lg text-white hover:bg-white/20 transition-colors"
+                  onClick={downloadImage}
+                  className="p-2 rounded-full text-zinc-500 hover:text-black hover:bg-black/5 transition-colors"
                   title="Download"
                 >
-                  <Download size={16} />
+                  <Download size={18} />
                 </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteImage(img.id);
-                  }}
-                  className="p-2 glass-panel rounded-lg text-red-400 hover:bg-red-500/20 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-
-              {/* Dimensions */}
-              <div className="absolute bottom-2 left-2 px-2 py-1 glass-panel rounded-md text-xs text-white/80">
-                {img.width} × {img.height}
-              </div>
-            </div>
-          ))}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Empty State */}
-        {generatedImages.length === 0 && (
+
+        {/* =========================================
+            CENTRAL CANVAS WORKSPACE
+        ========================================= */}
+        <div className="absolute inset-0 flex items-center justify-center p-4 pt-20 pb-48 md:pb-32 md:pl-[380px] md:pr-24 z-0">
+          {/* Dynamic Aspect Ratio Container */}
           <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            className={`relative w-full max-h-full rounded-2xl md:rounded-3xl shadow-2xl transition-all duration-500 ease-in-out flex items-center justify-center overflow-hidden bg-white ${activeTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : activeTool === 'pen' ? 'cursor-crosshair' : 'cursor-default'}`}
             style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              aspectRatio: aspectRatio.cssRatio,
+              maxWidth: '100%',
+              border: '1px solid rgba(0,0,0,0.05)'
             }}
           >
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center mx-auto mb-6">
-                <Wand2 className="h-10 w-10 text-[#EF8354]" />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Start Creating</h2>
-              <p className="text-zinc-400">Click "Generate" in the panel below to create images</p>
-              <p className="text-zinc-500 text-sm mt-4">Pan: Middle click or Hand tool • Zoom: Ctrl + Scroll</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Generate Panel */}
-      {showPanel === 'generate' && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-4xl px-4">
-          <div className="glass-panel rounded-3xl p-6 border border-white/10">
-            {/* Prompt Input */}
-            <div className="mb-4">
-              <textarea
-                className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#EF8354]/50 resize-none h-24"
-                placeholder="Describe what you want to create..."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+            {currentImageUrl ? (
+              <img
+                src={currentImageUrl}
+                alt="Generated Canvas"
+                className={`w-full h-full object-cover transition-all duration-700 ${isGenerating ? 'scale-105 blur-md' : 'scale-100 blur-0'}`}
+                style={{ filter: 'contrast(1.1) brightness(0.9)' }}
               />
+            ) : (
+              /* Empty state — matching the design spirit */
+              <div className="flex flex-col items-center justify-center text-center p-8 select-none">
+                <div className="w-16 h-16 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] mb-4">
+                  <Sparkles size={28} />
+                </div>
+                <h2 className="text-lg font-bold text-zinc-700 mb-1">Start Creating</h2>
+                <p className="text-sm text-zinc-400 max-w-[280px]">Enter a prompt below and click Generate to create images</p>
+              </div>
+            )}
+
+            {/* Drawing Canvas Overlay */}
+            {activeTool === 'pen' && !isGenerating && (
+              <canvas
+                ref={drawingCanvasRef}
+                className="absolute inset-0 w-full h-full z-20 touch-none"
+              />
+            )}
+
+            {/* Generating Overlay */}
+            {isGenerating && (
+              <div className="absolute inset-0 glass-overlay z-30 flex flex-col items-center justify-center">
+                <div className="scan-line"></div>
+                <Loader2 className="animate-spin text-[#EF8354] mb-4" size={40} />
+                <div className="bg-white/80 backdrop-blur-md px-6 py-2 rounded-full shadow-lg border border-white font-semibold text-zinc-700 text-sm animate-pulse">
+                  Synthesizing {aspectRatio.label} Image...
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+
+        {/* =========================================
+            LEFT PANEL: PARAMETERS
+        ========================================= */}
+        {isSidebarOpen && (
+          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        )}
+
+        <aside className={`absolute top-20 bottom-44 md:top-24 md:bottom-24 left-4 md:left-6 w-[320px] md:w-[340px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-6 custom-scrollbar overflow-y-auto transition-transform duration-300 ease-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
+
+          <header className="flex items-center justify-between pb-2 shrink-0">
+            <h2 className="text-lg font-bold text-zinc-800">Parameters</h2>
+            <button className="text-zinc-400 hover:text-zinc-600 md:hidden" onClick={() => setIsSidebarOpen(false)}>
+              <ChevronsLeft size={20} />
+            </button>
+          </header>
+
+          {/* Reference Image Zone */}
+          <section className="space-y-3 shrink-0">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-semibold text-zinc-700">Reference Image</label>
+              {referenceImage ? (
+                <button onClick={() => setReferenceImage(null)} className="text-[11px] font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
+                  <Trash2 size={12} /> Clear
+                </button>
+              ) : (
+                <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">Optional</span>
+              )}
             </div>
 
-            {/* Style Presets */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {PRESET_STYLES.map((preset) => (
+            <div
+              className="w-full aspect-[4/2.5] rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all group relative overflow-hidden"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
+
+              {referenceImage ? (
+                <img src={referenceImage} alt="Reference" className="w-full h-full object-cover" />
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] mb-3 group-hover:scale-110 transition-transform">
+                    <ImagePlus size={20} />
+                  </div>
+                  <span className="text-sm font-semibold text-zinc-700">Drop image here</span>
+                  <span className="text-xs text-zinc-400 mt-1">or click to browse</span>
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* Aspect Ratio (Scrollable Row) */}
+          <section className="space-y-3 shrink-0">
+            <label className="text-sm font-semibold text-zinc-700 flex justify-between">
+              Aspect Ratio <span className="text-[#EF8354] font-bold">{aspectRatio.label}</span>
+            </label>
+            <div className="bg-zinc-100/80 p-1.5 rounded-2xl flex items-center gap-1 border border-zinc-200/50 overflow-x-auto custom-scrollbar">
+              {ASPECT_RATIOS.map((ratio) => (
                 <button
-                  key={preset.name}
-                  onClick={() => applyPreset(preset.name)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedPreset === preset.name
-                      ? 'bg-[#EF8354] text-white'
-                      : 'bg-white/10 text-zinc-400 hover:bg-white/20'
-                    }`}
+                  key={ratio.id}
+                  onClick={() => setAspectRatio(ratio)}
+                  className={`flex-1 min-w-[60px] flex flex-col justify-center items-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all shrink-0 ${aspectRatio.id === ratio.id ? 'bg-white shadow-sm text-[#EF8354] border border-[#EF8354]/20' : 'text-zinc-500 hover:text-zinc-700 hover:bg-white/50'}`}
                 >
-                  {preset.name}
+                  <div className={`${ratio.shapeClass}`}></div>
+                  <span>{ratio.label}</span>
                 </button>
               ))}
             </div>
+          </section>
 
-            {/* Settings Row */}
-            <div className="flex flex-wrap items-center gap-4 mb-4">
-              {/* Aspect Ratio */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-400">Ratio:</span>
-                <div className="flex gap-1">
-                  {ASPECT_RATIOS.slice(0, 4).map((ratio) => (
-                    <button
-                      key={ratio.id}
-                      onClick={() => setAspectRatio(ratio)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${aspectRatio.id === ratio.id
-                          ? 'bg-[#EF8354] text-white'
-                          : 'bg-white/10 text-zinc-400 hover:bg-white/20'
-                        }`}
-                    >
-                      {ratio.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Model */}
+          {/* Model Selection */}
+          <section className="space-y-3 shrink-0">
+            <label className="text-sm font-semibold text-zinc-700">Model</label>
+            <div className="relative">
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#EF8354]/50"
+                className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
               >
-                <option value="flux" className="bg-[#1a1a2e]">Flux Schnell</option>
-                <option value="zimage" className="bg-[#1a1a2e]">Z-Image Turbo</option>
-                <option value="gptimage" className="bg-[#1a1a2e]">GPT Image 1.5</option>
-                <option value="nanobanana" className="bg-[#1a1a2e]">NanoBanana</option>
-                <option value="klein" className="bg-[#1a1a2e]">FLUX.2 Klein</option>
+                {MODELS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
               </select>
+              <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+            </div>
+          </section>
+
+          {/* Sliders */}
+          <section className="space-y-6 pt-2 shrink-0">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-semibold text-zinc-700">Style Strength</label>
+                <span className="text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 border border-[#EF8354]/20 px-2 py-1 rounded-md">{styleStrength}%</span>
+              </div>
+              <div className="relative pt-2">
+                <input type="range" min="0" max="100" value={styleStrength} onChange={(e) => setStyleStrength(parseInt(e.target.value))} />
+              </div>
             </div>
 
-            {/* Modifiers */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {ALL_MODIFIERS.slice(0, 6).map((mod) => {
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-semibold text-zinc-700">Guidance Scale</label>
+                <span className="text-xs font-bold text-zinc-600 bg-zinc-100 border border-zinc-200 px-2 py-1 rounded-md">{guidanceScale.toFixed(1)}</span>
+              </div>
+              <div className="relative pt-2">
+                <input type="range" min="1" max="20" step="0.1" value={guidanceScale} onChange={(e) => setGuidanceScale(parseFloat(e.target.value))} />
+              </div>
+            </div>
+          </section>
+
+          {/* Toggle Switches */}
+          <section className="space-y-4 shrink-0">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-zinc-700">Enhance Prompt</label>
+              <div className={`toggle-switch ${enhance ? 'active' : ''}`} onClick={() => setEnhance(!enhance)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-zinc-700">Safe Mode</label>
+              <div className={`toggle-switch ${safe ? 'active' : ''}`} onClick={() => setSafe(!safe)} />
+            </div>
+          </section>
+
+          {/* Advanced Settings Accordion */}
+          <section className="pt-4 border-t border-zinc-200/50 mt-auto shrink-0">
+            <button
+              className="flex items-center justify-between w-full text-zinc-500 hover:text-zinc-800 transition-colors py-2"
+              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+            >
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal size={16} />
+                <span className="text-sm font-semibold">Advanced Settings</span>
+              </div>
+              <ChevronDown size={16} className={`transition-transform duration-300 ${isAdvancedOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isAdvancedOpen ? 'max-h-[200px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+              <div className="space-y-5 pb-2">
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-xs font-semibold text-zinc-600 shrink-0">Seed</label>
+                  <div className="flex flex-1 items-center bg-zinc-100/80 rounded-lg px-3 py-1.5 border border-zinc-200/50">
+                    <input
+                      type="number"
+                      value={seed}
+                      onChange={(e) => setSeed(Number(e.target.value))}
+                      className="w-full bg-transparent text-xs font-mono text-zinc-700 focus:outline-none"
+                      placeholder="-1 for random"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <label className="text-xs font-semibold text-zinc-600 shrink-0">Steps</label>
+                  <input type="range" min="1" max="100" value={steps} onChange={(e) => setSteps(parseInt(e.target.value))} className="flex-1" />
+                  <span className="text-xs font-bold text-zinc-600 w-6 text-right">{steps}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </aside>
+
+
+        {/* =========================================
+            BOTTOM PANEL: PROMPT & GENERATE
+        ========================================= */}
+        <div className="absolute bottom-4 md:bottom-6 left-4 right-4 md:left-[380px] md:right-24 glass-panel rounded-[24px] md:rounded-3xl p-3 md:p-5 z-40 flex flex-col gap-3 md:gap-4 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] max-w-4xl mx-auto">
+
+          <div className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4">
+            {/* Prompt Textarea */}
+            <div className="flex-1 relative bg-white/40 md:bg-transparent rounded-2xl md:rounded-none p-3 md:p-0">
+              <textarea
+                className="w-full bg-transparent resize-none text-zinc-700 text-sm md:text-base leading-relaxed focus:outline-none placeholder:text-zinc-400 h-20 md:h-16 prompt-scrollbar"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe what you want to see..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleGenerate();
+                  }
+                }}
+              />
+            </div>
+
+            {/* Generate Button */}
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className={`text-white px-6 py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0 h-[60px] md:h-16
+                ${isGenerating
+                  ? 'bg-zinc-400 shadow-none cursor-not-allowed'
+                  : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl hover:shadow-[#EF8354]/30'
+                }`}
+            >
+              {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+              {isGenerating ? 'Synthesizing...' : 'Generate'}
+            </button>
+          </div>
+
+          {/* Bottom Modifiers Row */}
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-200/50">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-1 custom-scrollbar w-full md:w-auto">
+              <span className="text-xs font-semibold text-zinc-400 mr-1 md:mr-2 uppercase tracking-wide shrink-0">Modifiers:</span>
+              {ALL_MODIFIERS.map((mod) => {
                 const isActive = activeModifiers.includes(mod);
                 return (
                   <button
                     key={mod}
                     onClick={() => toggleModifier(mod)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${isActive
-                        ? 'bg-[#EF8354]/20 text-[#EF8354] border-[#EF8354]/50'
-                        : 'bg-white/5 text-zinc-400 border-white/10 hover:border-white/30'
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm whitespace-nowrap transition-colors border shrink-0
+                      ${isActive
+                        ? 'bg-[#EF8354]/10 text-[#EF8354] border-[#EF8354]/30'
+                        : 'bg-white text-zinc-600 border-zinc-200 hover:border-[#EF8354]/50'
                       }`}
                   >
-                    {isActive && <Check size={10} className="inline mr-1" />}
+                    {isActive && <Check size={12} strokeWidth={3} />}
                     {mod}
                   </button>
                 );
               })}
             </div>
 
-            {/* Generate Button */}
-            <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !prompt.trim()}
-              className={`w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all ${isGenerating || !prompt.trim()
-                  ? 'bg-zinc-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-[#EF8354] to-purple-600 hover:from-[#e27344] hover:to-purple-500 shadow-lg shadow-[#EF8354]/25'
-                }`}
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={20} />
-                  Generate Image
-                </>
-              )}
+            <button className="hidden md:flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-[#EF8354] transition-colors whitespace-nowrap pl-4 shrink-0 border-l border-zinc-200 ml-2">
+              <Plus size={14} />
+              Custom
             </button>
           </div>
+
         </div>
-      )}
 
-      {/* History Panel */}
-      {showPanel === 'history' && (
-        <div className="fixed top-20 right-6 z-50 w-80">
-          <div className="glass-panel rounded-2xl p-4 border border-white/10 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-white">Gallery</h3>
-              <button
-                onClick={() => setShowPanel('none')}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-              >
-                <X size={16} />
-              </button>
-            </div>
 
-            {storage.getHistory().length === 0 ? (
-              <div className="text-center py-8">
-                <Sparkles className="h-8 w-8 text-zinc-600 mx-auto mb-2" />
-                <p className="text-sm text-zinc-500">No images yet</p>
+        {/* =========================================
+            GALLERY OVERLAY
+        ========================================= */}
+        {showOverlay === 'gallery' && (
+          <>
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60]" onClick={() => setShowOverlay('none')} />
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[70] w-[90vw] max-w-2xl animate-fade-in">
+              <div className="glass-panel rounded-3xl p-6 border border-white/50 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-bold text-zinc-800 text-lg">Gallery</h3>
+                  <button onClick={() => setShowOverlay('none')} className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-black/5 transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
+                <GalleryGrid onLoad={loadFromGallery} />
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {storage.getHistory().slice(0, 12).map((item) => (
-                  <div
-                    key={item.id}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer group relative"
-                    onClick={() => {
-                      // Load image to canvas
-                      const newImage = {
-                        id: generateId(),
-                        url: item.imageUrl,
-                        x: -pan.x + (window.innerWidth / 2 - 256),
-                        y: -pan.y + (window.innerHeight / 2 - 256),
-                        width: 512,
-                        height: 512,
-                      };
-                      setGeneratedImages((prev) => [...prev, newImage]);
-                      setShowPanel('none');
-                      toast.success('Added to canvas');
-                    }}
-                  >
-                    <img src={item.imageUrl} alt={item.prompt} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-xs text-white font-medium">Add to Canvas</span>
-                    </div>
+            </div>
+          </>
+        )}
+
+
+        {/* =========================================
+            SETTINGS OVERLAY (BYOP + Manual Key)
+        ========================================= */}
+        {showOverlay === 'settings' && (
+          <>
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60]" onClick={() => setShowOverlay('none')} />
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[70] w-[90vw] max-w-md animate-fade-in">
+              <div className="glass-panel rounded-3xl p-6 border border-white/50">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="font-bold text-zinc-800 text-lg">Settings</h3>
+                  <button onClick={() => setShowOverlay('none')} className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-black/5 transition-colors">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="space-y-5">
+                  {/* BYOP: One-click Connect */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
+                      <LogIn size={14} /> Connect with Pollinations
+                    </label>
+                    <p className="text-xs text-zinc-400">Sign in to connect your Pollinations account. Your pollen, your usage.</p>
+                    <button
+                      onClick={handleBYOPAuth}
+                      className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] shadow-lg shadow-[#EF8354]/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink size={16} />
+                      Connect via Pollinations
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Settings Panel */}
-      {showPanel === 'settings' && (
-        <div className="fixed top-20 right-6 z-50 w-80">
-          <div className="glass-panel rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-white">Settings</h3>
-              <button
-                onClick={() => setShowPanel('none')}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
-              >
-                <X size={16} />
-              </button>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-zinc-200"></div>
+                    <span className="text-xs font-semibold text-zinc-400 uppercase">or</span>
+                    <div className="flex-1 h-px bg-zinc-200"></div>
+                  </div>
+
+                  {/* Manual API Key */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-zinc-700 flex items-center gap-2">
+                      <Key size={14} /> Manual API Key
+                    </label>
+                    <ApiKeyInput onSave={() => {
+                      setHasApiKey(true);
+                      const key = storage.getApiKey();
+                      if (key) pollinationsAPI.setApiKey(key);
+                    }} />
+                  </div>
+
+                  {/* Connection status */}
+                  {hasApiKey && (
+                    <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-green-50 border border-green-200">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <span className="text-xs font-semibold text-green-700">Connected</span>
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-zinc-200/50">
+                    <p className="text-xs text-zinc-500">
+                      Get your free API key at{' '}
+                      <a href="https://enter.pollinations.ai" target="_blank" rel="noopener noreferrer" className="text-[#EF8354] hover:underline font-medium">
+                        enter.pollinations.ai
+                      </a>
+                    </p>
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      Images are generated via Pollinations API and served from their CDN. History is saved in your browser&apos;s localStorage.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
+          </>
+        )}
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-zinc-400 mb-2 block">API Key</label>
-                <ApiKeyInput />
-              </div>
-
-              <div className="pt-4 border-t border-white/10">
-                <p className="text-xs text-zinc-500">
-                  Get your free API key at{' '}
-                  <a
-                    href="https://enter.pollinations.ai"
-                    target="_blank"
-                    className="text-[#EF8354] hover:underline"
-                  >
-                    enter.pollinations.ai
-                  </a>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// API Key Input Component
-function ApiKeyInput() {
-  const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
+
+// =============================================
+//  GALLERY GRID COMPONENT
+// =============================================
+function GalleryGrid({ onLoad }: { onLoad: (item: HistoryItem) => void }) {
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   useEffect(() => {
-    const saved = storage.getApiKey();
-    if (saved) setApiKey(saved);
+    setHistory(storage.getHistory());
+  }, []);
+
+  if (history.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
+          <Sparkles className="text-zinc-400" size={20} />
+        </div>
+        <p className="text-sm text-zinc-500 font-medium">No images yet</p>
+        <p className="text-xs text-zinc-400 mt-1">Generated images will appear here</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {history.map((item) => (
+        <div
+          key={item.id}
+          className="aspect-square rounded-2xl overflow-hidden cursor-pointer group relative bg-zinc-100 hover:ring-2 hover:ring-[#EF8354]/50 transition-all"
+          onClick={() => onLoad(item)}
+        >
+          <img src={item.imageUrl} alt={item.prompt} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2">
+            <span className="text-xs text-white font-semibold mb-1">Load to Canvas</span>
+            <span className="text-[10px] text-white/70 line-clamp-2 text-center">{item.prompt}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+// =============================================
+//  API KEY INPUT COMPONENT
+// =============================================
+function ApiKeyInput({ onSave }: { onSave: () => void }) {
+  const [apiKey, setApiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const key = storage.getApiKey();
+    if (key) setApiKey(key);
   }, []);
 
   const handleSave = () => {
+    if (!apiKey.trim()) {
+      toast.error('Please enter an API key');
+      return;
+    }
     storage.setApiKey(apiKey.trim());
+    setSaved(true);
+    onSave();
     toast.success('API key saved');
+    setTimeout(() => setSaved(false), 2000);
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <div className="flex gap-2">
-        <input
-          type={showKey ? 'text' : 'password'}
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="sk_..."
-          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#EF8354]/50"
-        />
+        <div className="flex-1 flex items-center bg-zinc-100/80 rounded-xl px-3 py-2 border border-zinc-200/50">
+          <input
+            type={showKey ? 'text' : 'password'}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="sk_..."
+            className="w-full bg-transparent text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none font-mono"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+          />
+        </div>
         <button
           onClick={() => setShowKey(!showKey)}
-          className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10"
+          className="p-2.5 rounded-xl border border-zinc-200/50 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
         >
           {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
       <button
         onClick={handleSave}
-        className="w-full py-2 bg-[#EF8354] text-white rounded-lg text-sm font-medium hover:bg-[#e27344] transition-colors"
+        className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all ${saved
+          ? 'bg-green-500 text-white'
+          : 'bg-zinc-800 text-white hover:bg-zinc-700'
+          }`}
       >
-        Save API Key
+        {saved ? (
+          <span className="flex items-center justify-center gap-1.5"><Check size={14} /> Saved!</span>
+        ) : (
+          'Save API Key'
+        )}
       </button>
     </div>
   );
