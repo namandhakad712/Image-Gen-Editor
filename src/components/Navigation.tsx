@@ -6,7 +6,7 @@ import { Image as ImageIcon, Wand2, History, Settings, Sparkles } from 'lucide-r
 
 const navItems = [
   { href: '/', label: 'Generate', icon: Wand2 },
-  { href: '/edit', label: 'Edit', icon: Image ImageIcon },
+  { href: '/edit', label: 'Edit', icon: ImageIcon },
   { href: '/history', label: 'History', icon: History },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
