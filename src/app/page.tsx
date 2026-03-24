@@ -7,7 +7,7 @@ import {
   SlidersHorizontal, Menu, X, Loader2, Trash2, Check,
   Eye, EyeOff, Download, LogIn, Key, ExternalLink,
   History, Image, Wand2, ChevronRight, Video, BarChart3,
-  RotateCcw, RotateCw
+  RotateCcw, RotateCw, Images, ArrowRightLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
@@ -42,6 +42,7 @@ const MODIFIER_PROMPTS = ALL_MODIFIERS.reduce((acc, m) => {
 }, {} as Record<string, string>);
 
 const DEFAULT_MODELS = [
+  { value: 'nova-fast', label: 'Amazon Nova Micro - Fast & Cheap' },
   { value: 'flux', label: 'Flux Schnell' },
   { value: 'zimage', label: 'Z-Image Turbo' },
   { value: 'gptimage', label: 'GPT Image 1 Mini' },
@@ -103,6 +104,13 @@ export default function SpatialImageEditor() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[]>([]);
 
+  // Variations state
+  const [generatingVariations, setGeneratingVariations] = useState<string | null>(null);
+  const [variationBaseImage, setVariationBaseImage] = useState<{id: string; url: string; prompt: string} | null>(null);
+
+  // Comparison state
+  const [comparisonImages, setComparisonImages] = useState<{left: string; right: string} | null>(null);
+
   // Parameters
   const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[5]);
   const [styleStrength, setStyleStrength] = useState(75);
@@ -111,7 +119,7 @@ export default function SpatialImageEditor() {
   const [steps, setSteps] = useState(30);
   const [activeModifiers, setActiveModifiers] = useState<string[]>([]);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState('flux');
+  const [selectedModel, setSelectedModel] = useState('nova-fast');
   const [penColor, setPenColor] = useState('#EF8354');
   const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
@@ -427,6 +435,68 @@ export default function SpatialImageEditor() {
     }
   };
 
+  // Generate variations of an image
+  const generateVariations = async (image: {id: string; url: string; prompt: string}) => {
+    if (!hasApiKey) { toast.error('Add API key first'); return; }
+    setGeneratingVariations(image.id);
+    setVariationBaseImage(image);
+    
+    try {
+      const baseSeed = Math.floor(Math.random() * 999999999);
+      const variations = [];
+      
+      // Generate 4 variations with different seeds
+      for (let i = 0; i < 4; i++) {
+        const variationSeed = baseSeed + i * 1000;
+        const canvasImg = canvasImages.find(img => img.id === image.id);
+        const params: GenerationParams = {
+          model: selectedModel,
+          prompt: image.prompt,
+          width: canvasImg?.width || 1024,
+          height: canvasImg?.height || 1024,
+          seed: variationSeed,
+          enhance,
+          safe,
+          quality: 'high' as const,
+        };
+        
+        const imageUrl = await pollinationsAPI.generateImage(params);
+        variations.push({
+          id: generateId(),
+          url: imageUrl,
+          prompt: image.prompt,
+          width: params.width,
+          height: params.height,
+          x: 0, y: 0,
+        });
+      }
+      
+      // Add variations to canvas in a grid
+      const startX = (-pan.x + window.innerWidth / 2) / zoom - 200;
+      const startY = (-pan.y + window.innerHeight / 2) / zoom + 300;
+      
+      variations.forEach((v, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        v.x = startX + col * 250;
+        v.y = startY + row * 250;
+        setCanvasImages(prev => [...prev, v]);
+      });
+      
+      toast.success('4 variations generated!');
+    } catch (error) {
+      console.error('Variation error:', error);
+      toast.error('Failed to generate variations');
+    } finally {
+      setGeneratingVariations(null);
+    }
+  };
+
+  // Open comparison view
+  const openComparison = (image1: string, image2: string) => {
+    setComparisonImages({ left: image1, right: image2 });
+  };
+
   // Undo/Redo for pen strokes
   const undoPenStroke = () => {
     if (penHistoryIndex >= 0) {
@@ -631,6 +701,20 @@ export default function SpatialImageEditor() {
               <div className={`absolute -top-3 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
                 img.width < 400 ? 'scale-75' : img.width < 800 ? 'scale-90' : 'scale-100'
               }`}>
+                {/* Variations button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); generateVariations({id: img.id, url: img.url, prompt: img.prompt}); }}
+                  disabled={generatingVariations === img.id}
+                  className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:text-[#EF8354] hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md disabled:opacity-50"
+                >
+                  {generatingVariations === img.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Images size={12} />
+                  )}
+                  <span className="hidden sm:inline">{generatingVariations === img.id ? '...' : 'Variations'}</span>
+                </button>
+                
                 <button
                   onClick={(e) => { e.stopPropagation(); downloadImage(img.url, img.id); }}
                   className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:text-[#EF8354] hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md"
@@ -1127,6 +1211,101 @@ export default function SpatialImageEditor() {
         </div>
       )}
 
+      {/* Image Comparison Modal */}
+      {comparisonImages && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-md" onClick={() => setComparisonImages(null)}>
+          <div className="glass-panel rounded-3xl p-6 w-full max-w-4xl bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-zinc-800 flex items-center gap-2">
+                <ArrowRightLeft size={20} />
+                Compare Images
+              </h3>
+              <button onClick={() => setComparisonImages(null)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            
+            {/* Comparison Slider */}
+            <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-100">
+              <ComparisonSlider leftImage={comparisonImages.left} rightImage={comparisonImages.right} />
+            </div>
+            
+            <div className="flex items-center justify-center gap-4 mt-6">
+              <button
+                onClick={() => setComparisonImages(null)}
+                className="px-6 py-3 rounded-xl font-semibold text-sm border border-zinc-200 hover:bg-zinc-50 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// Comparison Slider Component
+function ComparisonSlider({ leftImage, rightImage }: { leftImage: string; rightImage: string }) {
+  const [position, setPosition] = useState(50);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMove = useCallback((clientX: number) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    setPosition((x / rect.width) * 100);
+  }, []);
+
+  const handleMouseDown = () => setIsDragging(true);
+  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) handleMove(e.clientX);
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    handleMove(e.touches[0].clientX);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full h-full cursor-ew-resize select-none"
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseMove={handleMouseMove}
+      onTouchMove={handleTouchMove}
+      onMouseLeave={handleMouseUp}
+    >
+      {/* Right Image (Background) */}
+      <img src={rightImage} alt="Right" className="absolute inset-0 w-full h-full object-cover" />
+      
+      {/* Left Image (Clipped) */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+      >
+        <img src={leftImage} alt="Left" className="absolute inset-0 w-full h-full object-cover" />
+      </div>
+      
+      {/* Slider Handle */}
+      <div
+        className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
+        style={{ left: `${position}%` }}
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center">
+          <ArrowRightLeft size={16} className="text-zinc-600" />
+        </div>
+      </div>
+      
+      {/* Labels */}
+      <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/50 text-white text-xs font-semibold backdrop-blur-sm">
+        Original
+      </div>
+      <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-black/50 text-white text-xs font-semibold backdrop-blur-sm">
+        Variation
+      </div>
     </div>
   );
 }
