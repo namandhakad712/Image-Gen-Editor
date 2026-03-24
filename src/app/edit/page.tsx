@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutGrid, Settings, Upload, Wand2, History,
   Sparkles, Loader2, ImagePlus, Trash2, Download, X,
-  RotateCcw, ChevronDown
+  RotateCcw, ChevronDown, Video, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
@@ -149,6 +149,12 @@ export default function EditPage() {
               </a>
               <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
                 <ImagePlus size={16} /> Image Editor
+              </a>
+              <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <Video size={16} /> Video Generation
+              </a>
+              <a href="/usage" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <BarChart3 size={16} /> Usage Dashboard
               </a>
               <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Settings size={16} /> Settings

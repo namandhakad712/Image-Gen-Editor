@@ -6,7 +6,7 @@ import {
   ImagePlus, ChevronDown, ChevronsLeft, Sparkles, Plus,
   SlidersHorizontal, Menu, X, Loader2, Trash2, Check,
   Eye, EyeOff, Download, LogIn, Key, ExternalLink,
-  History, Image, Wand2, ChevronRight
+  History, Image, Wand2, ChevronRight, Video, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
@@ -34,11 +34,21 @@ const DEFAULT_MODELS = [
   { value: 'flux', label: 'Flux Schnell' },
   { value: 'zimage', label: 'Z-Image Turbo' },
   { value: 'gptimage', label: 'GPT Image 1 Mini' },
+  { value: 'gptimage-large', label: 'GPT Image 1.5' },
   { value: 'nanobanana', label: 'NanoBanana' },
+  { value: 'nanobanana-2', label: 'NanoBanana 2' },
+  { value: 'nanobanana-pro', label: 'NanoBanana Pro' },
   { value: 'klein', label: 'FLUX.2 Klein 4B' },
   { value: 'kontext', label: 'FLUX.1 Kontext' },
-  { value: 'gptimage-large', label: 'GPT Image 1.5' },
   { value: 'seedream5', label: 'Seedream 5.0 Lite' },
+  { value: 'seedream', label: 'Seedream 4.0' },
+  { value: 'seedream-pro', label: 'Seedream 4.5 Pro' },
+  { value: 'qwen-image', label: 'Qwen Image Plus' },
+  { value: 'grok-imagine', label: 'Grok Imagine' },
+  { value: 'grok-imagine-pro', label: 'Grok Imagine Pro' },
+  { value: 'p-image', label: 'Pruna p-image' },
+  { value: 'p-image-edit', label: 'Pruna p-image-edit' },
+  { value: 'nova-canvas', label: 'Amazon Nova Canvas' },
 ];
 
 const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin : 'https://image-gen-editor.vercel.app';
@@ -82,6 +92,11 @@ export default function SpatialImageEditor() {
   const [safe, setSafe] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [models, setModels] = useState(DEFAULT_MODELS);
+  
+  // Advanced parameters
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [nologo, setNologo] = useState(false);
+  const [transparent, setTransparent] = useState(false);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,13 +206,26 @@ export default function SpatialImageEditor() {
         width: aspectRatio.width, height: aspectRatio.height,
         seed: actualSeed, enhance, safe, quality: 'high' as const,
         image: referenceImages.length > 0 ? referenceImages.join('|') : undefined,
+        negativePrompt: negativePrompt || undefined,
+        nologo,
+        transparent: transparent && (selectedModel.includes('gptimage')),
+        styleStrength,
+        guidanceScale,
+        steps,
       };
 
       let imageUrl: string;
-      if (referenceImages.length > 0) {
+      // Use OpenAI endpoint when we have reference images or advanced params
+      if (referenceImages.length > 0 || negativePrompt || nologo || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
         imageUrl = await pollinationsAPI.generateImageOpenAI({
           prompt: fullPrompt, model: selectedModel,
           seed: actualSeed, enhance, safe,
+          negative_prompt: negativePrompt || undefined,
+          nologo,
+          transparent: transparent && (selectedModel.includes('gptimage')),
+          style_strength: styleStrength !== 75 ? styleStrength : undefined,
+          guidance: guidanceScale !== 7.5 ? guidanceScale : undefined,
+          steps: steps !== 30 ? steps : undefined,
         });
       } else {
         imageUrl = await pollinationsAPI.generateImage(params);
@@ -481,6 +509,12 @@ export default function SpatialImageEditor() {
               <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <ImagePlus size={16} /> Image Editor
               </a>
+              <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <Video size={16} /> Video Generation
+              </a>
+              <a href="/usage" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <BarChart3 size={16} /> Usage Dashboard
+              </a>
               <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Settings size={16} /> Settings
               </a>
@@ -681,6 +715,16 @@ export default function SpatialImageEditor() {
             <label className="text-sm font-semibold text-zinc-700">Safe Mode</label>
             <div className={`toggle-switch ${safe ? 'active' : ''}`} onClick={() => setSafe(!safe)} />
           </div>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-zinc-700">No Logo</label>
+            <div className={`toggle-switch ${nologo ? 'active' : ''}`} onClick={() => setNologo(!nologo)} />
+          </div>
+          {selectedModel.includes('gptimage') && (
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold text-zinc-700">Transparent BG</label>
+              <div className={`toggle-switch ${transparent ? 'active' : ''}`} onClick={() => setTransparent(!transparent)} />
+            </div>
+          )}
         </section>
 
         {/* Advanced Settings */}
@@ -692,8 +736,20 @@ export default function SpatialImageEditor() {
             </div>
             <ChevronDown size={16} className={`transition-transform duration-300 ${isAdvancedOpen ? 'rotate-180' : ''}`} />
           </button>
-          <div className={`overflow-hidden transition-all duration-300 ${isAdvancedOpen ? 'max-h-[200px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
+          <div className={`overflow-hidden transition-all duration-300 ${isAdvancedOpen ? 'max-h-[400px] opacity-100 mt-3' : 'max-h-0 opacity-0'}`}>
             <div className="space-y-4 pb-2">
+              {/* Negative Prompt */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-600">Negative Prompt</label>
+                <textarea
+                  value={negativePrompt}
+                  onChange={e => setNegativePrompt(e.target.value)}
+                  className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-lg px-3 py-2 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+                  placeholder="What to avoid in the image..."
+                  rows={2}
+                />
+              </div>
+              
               <div className="flex items-center justify-between gap-4">
                 <label className="text-xs font-semibold text-zinc-600 shrink-0">Seed</label>
                 <div className="flex flex-1 items-center bg-zinc-100/80 rounded-lg px-3 py-1.5 border border-zinc-200/50">

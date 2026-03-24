@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import {
   LayoutGrid, Settings as SettingsIcon, Key, LogIn, ExternalLink,
   Eye, EyeOff, Check, Trash2, X, Wand2, History, Shield, Info,
-  Zap, Globe, ImagePlus
+  Zap, Globe, ImagePlus, User, CreditCard, Calendar, Shield as ShieldIcon,
+  Video, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage } from '@/lib/utils';
 import { pollinationsAPI } from '@/lib/api';
+import { UserProfile, ApiKeyInfo } from '@/types';
 
 const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin + '/settings' : 'https://image-gen-editor.vercel.app/settings';
 const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
@@ -20,10 +22,23 @@ export default function SettingsPage() {
   const [hasKey, setHasKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [keyInfo, setKeyInfo] = useState<ApiKeyInfo | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const checkUserBalance = async () => {
     const bal = await pollinationsAPI.checkBalance();
     setBalance(bal);
+  };
+
+  const loadProfile = async () => {
+    const prof = await pollinationsAPI.getProfile();
+    setProfile(prof);
+  };
+
+  const loadKeyInfo = async () => {
+    const info = await pollinationsAPI.getApiKeyInfo();
+    setKeyInfo(info);
   };
 
   // Grab key from BYOP hash redirect
@@ -37,6 +52,8 @@ export default function SettingsPage() {
         setHasKey(true);
         pollinationsAPI.setApiKey(key);
         checkUserBalance();
+        loadProfile();
+        loadKeyInfo();
         toast.success('Connected! API key received via Pollinations');
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -47,6 +64,8 @@ export default function SettingsPage() {
       setHasKey(true);
       pollinationsAPI.setApiKey(savedKey);
       checkUserBalance();
+      loadProfile();
+      loadKeyInfo();
     }
   }, []);
 
@@ -62,6 +81,8 @@ export default function SettingsPage() {
     setHasKey(true);
     setSaved(true);
     checkUserBalance();
+    loadProfile();
+    loadKeyInfo();
     toast.success('API key saved');
     setTimeout(() => setSaved(false), 2000);
   };
@@ -72,6 +93,8 @@ export default function SettingsPage() {
     setApiKey('');
     setHasKey(false);
     setBalance(null);
+    setProfile(null);
+    setKeyInfo(null);
     toast.success('API key removed');
   };
 
@@ -110,6 +133,12 @@ export default function SettingsPage() {
               </a>
               <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <ImagePlus size={16} /> Image Editor
+              </a>
+              <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <Video size={16} /> Video Generation
+              </a>
+              <a href="/usage" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
+                <BarChart3 size={16} /> Usage Dashboard
               </a>
               <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
                 <SettingsIcon size={16} /> Settings
@@ -151,6 +180,119 @@ export default function SettingsPage() {
             <button onClick={handleRemoveKey} className="text-xs font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1 shrink-0 self-start">
               <Trash2 size={12} /> Remove
             </button>
+          </div>
+        )}
+
+        {/* Profile Info */}
+        {hasKey && profile && (
+          <div className="glass-panel rounded-3xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-600">
+                <User size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-zinc-800">Account Profile</h2>
+                <p className="text-xs text-zinc-400">Your Pollinations account info</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Name</p>
+                <p className="text-sm font-medium text-zinc-700">{profile.name || 'N/A'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Email</p>
+                <p className="text-sm font-medium text-zinc-700">{profile.email || 'N/A'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Tier</p>
+                <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#EF8354]/10">
+                  <Zap size={10} className="text-[#EF8354]" />
+                  <span className="text-[11px] font-bold text-[#EF8354] uppercase tracking-wider">{profile.tier}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Member Since</p>
+                <p className="text-sm font-medium text-zinc-700">
+                  {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+
+            {profile.nextResetAt && (
+              <div className="flex items-center gap-2 pt-2 border-t border-zinc-200/50">
+                <Calendar size={14} className="text-zinc-400" />
+                <span className="text-xs text-zinc-500">Next pollen reset: <span className="font-medium text-zinc-700">{new Date(profile.nextResetAt).toLocaleString()}</span></span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* API Key Info */}
+        {hasKey && keyInfo && (
+          <div className="glass-panel rounded-3xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-600">
+                <Key size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-zinc-800">API Key Details</h2>
+                <p className="text-xs text-zinc-400">Information about your current API key</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Key Type</p>
+                <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${keyInfo.type === 'secret' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                  <ShieldIcon size={10} />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">{keyInfo.type}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Status</p>
+                <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${keyInfo.valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <Check size={10} />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">{keyInfo.valid ? 'Valid' : 'Invalid'}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Expires</p>
+                <p className="text-sm font-medium text-zinc-700">
+                  {keyInfo.expiresAt ? new Date(keyInfo.expiresAt).toLocaleDateString() : 'Never'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Budget</p>
+                <p className="text-sm font-medium text-zinc-700">
+                  {keyInfo.pollenBudget !== null && keyInfo.pollenBudget !== undefined ? `${keyInfo.pollenBudget} pollen` : 'Unlimited'}
+                </p>
+              </div>
+            </div>
+
+            {keyInfo.permissions && (keyInfo.permissions.models || keyInfo.permissions.account) && (
+              <div className="pt-3 border-t border-zinc-200/50 space-y-2">
+                <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Permissions</p>
+                {keyInfo.permissions.models && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {keyInfo.permissions.models.slice(0, 5).map((m, i) => (
+                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600 font-medium">{m}</span>
+                    ))}
+                    {keyInfo.permissions.models.length > 5 && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600 font-medium">+{keyInfo.permissions.models.length - 5} more</span>
+                    )}
+                  </div>
+                )}
+                {keyInfo.permissions.account && keyInfo.permissions.account.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {keyInfo.permissions.account.map((p, i) => (
+                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600 font-medium">{p}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

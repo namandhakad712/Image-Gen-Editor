@@ -5,6 +5,34 @@ export interface ImageModel {
   input_modalities: string[];
   output_modalities: string[];
   supported_endpoints: string[];
+  description?: string;
+  name?: string;
+  type?: string;
+}
+
+export interface VideoModel {
+  id: string;
+  object: string;
+  created: number;
+  input_modalities: string[];
+  output_modalities: string[];
+  supported_endpoints: string[];
+  description?: string;
+  name?: string;
+  type?: string;
+}
+
+export interface AudioModel {
+  id: string;
+  object: string;
+  created: number;
+  input_modalities: string[];
+  output_modalities: string[];
+  supported_endpoints: string[];
+  description?: string;
+  name?: string;
+  type?: string;
+  voices?: string[];
 }
 
 export interface TextModel {
@@ -33,11 +61,16 @@ export interface GenerationParams {
   duration?: number;
   aspectRatio?: '16:9' | '9:16';
   audio?: boolean;
+  nologo?: boolean;
+  transparent?: boolean;
+  styleStrength?: number;
+  guidanceScale?: number;
+  steps?: number;
 }
 
 export interface HistoryItem {
   id: string;
-  type: 'generate' | 'edit';
+  type: 'generate' | 'edit' | 'video' | 'audio';
   prompt: string;
   model: string;
   imageUrl: string;
@@ -57,4 +90,55 @@ export interface ApiError {
     requestId?: string;
     cause?: unknown;
   };
+}
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  githubUsername?: string;
+  image?: string;
+  tier: 'anonymous' | 'microbe' | 'spore' | 'seed' | 'flower' | 'nectar' | 'router';
+  createdAt: string;
+  nextResetAt?: string;
+}
+
+export interface UsageRecord {
+  timestamp: string;
+  type: string;
+  model: string;
+  api_key: string;
+  api_key_type: string;
+  meter_source: string;
+  input_text_tokens: number;
+  input_cached_tokens: number;
+  input_audio_tokens: number;
+  input_image_tokens: number;
+  output_text_tokens: number;
+  output_reasoning_tokens: number;
+  output_audio_tokens: number;
+  output_image_tokens: number;
+  cost_usd: number;
+  response_time_ms: number;
+}
+
+export interface DailyUsageRecord {
+  date: string;
+  model: string;
+  meter_source: string;
+  requests: number;
+  cost_usd: number;
+}
+
+export interface ApiKeyInfo {
+  valid: boolean;
+  type: 'publishable' | 'secret';
+  name?: string;
+  expiresAt?: string | null;
+  expiresIn?: number | null;
+  permissions?: {
+    models?: string[];
+    account?: string[];
+  };
+  pollenBudget?: number | null;
+  rateLimitEnabled?: boolean;
 }
