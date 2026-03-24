@@ -317,34 +317,60 @@ export default function SpatialImageEditor() {
         ? `${styleToUse.negative}${styleToUse.negative && negativePrompt ? ', ' : ''}${negativePrompt}`
         : styleToUse.negative;
 
-      const params: GenerationParams = {
-        model: selectedModel, prompt: fullPrompt,
-        width: aspectRatio.width, height: aspectRatio.height,
-        seed: actualSeed, enhance, safe, quality: 'high' as const,
-        image: referenceImages.length > 0 ? referenceImages.join('|') : undefined,
-        negativePrompt: fullNegative || undefined,
-        nologo,
-        transparent: transparent && (selectedModel.includes('gptimage')),
-        styleStrength,
-        guidanceScale,
-        steps,
-      };
+      // Detect if this is an image edit (has reference images) or text-to-image
+      const isEditMode = referenceImages.length > 0;
 
       let imageUrl: string;
-      // Use OpenAI endpoint when we have reference images or advanced params
-      if (referenceImages.length > 0 || fullNegative || nologo || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
-        imageUrl = await pollinationsAPI.generateImageOpenAI({
-          prompt: fullPrompt, model: selectedModel,
-          seed: actualSeed, enhance, safe,
-          negative_prompt: fullNegative || undefined,
+      
+      if (isEditMode) {
+        // IMAGE EDIT MODE - Uses /v1/images/edits endpoint
+        // Reference images are sent for editing
+        imageUrl = await pollinationsAPI.editImage({
+          model: selectedModel,
+          prompt: fullPrompt,
+          image: referenceImages.join('|'),
+          seed: actualSeed,
+          enhance,
+          safe,
+          width: aspectRatio.width,
+          height: aspectRatio.height,
+          negativePrompt: fullNegative || undefined,
           nologo,
           transparent: transparent && (selectedModel.includes('gptimage')),
-          style_strength: styleStrength !== 75 ? styleStrength : undefined,
-          guidance: guidanceScale !== 7.5 ? guidanceScale : undefined,
-          steps: steps !== 30 ? steps : undefined,
         });
+        
+        toast.success('Image edited!');
       } else {
-        imageUrl = await pollinationsAPI.generateImage(params);
+        // TEXT-TO-IMAGE MODE - Uses /image/{prompt} or /v1/images/generations
+        const params: GenerationParams = {
+          model: selectedModel, prompt: fullPrompt,
+          width: aspectRatio.width, height: aspectRatio.height,
+          seed: actualSeed, enhance, safe, quality: 'high' as const,
+          negativePrompt: fullNegative || undefined,
+          nologo,
+          transparent: transparent && (selectedModel.includes('gptimage')),
+          styleStrength,
+          guidanceScale,
+          steps,
+        };
+
+        // Use OpenAI endpoint when we have advanced params
+        if (fullNegative || nologo || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
+          imageUrl = await pollinationsAPI.generateImageOpenAI({
+            prompt: fullPrompt, model: selectedModel,
+            seed: actualSeed, enhance, safe,
+            negative_prompt: fullNegative || undefined,
+            nologo,
+            transparent: transparent && (selectedModel.includes('gptimage')),
+            style_strength: styleStrength !== 75 ? styleStrength : undefined,
+            guidance: guidanceScale !== 7.5 ? guidanceScale : undefined,
+            steps: steps !== 30 ? steps : undefined,
+          });
+        } else {
+          imageUrl = await pollinationsAPI.generateImage(params);
+        }
+        
+        toast.success('Image generated!');
       }
 
       // Place image on canvas with staggered position to avoid overlap
@@ -366,16 +392,39 @@ export default function SpatialImageEditor() {
       setSelectedImageId(newImg.id);
       setSeed(actualSeed);
 
-      // Save history
+      // Save history with correct type
       const historyItem: HistoryItem = {
-        id: generateId(), type: 'generate', prompt: fullPrompt,
-        model: selectedModel, imageUrl, params, createdAt: Date.now(),
-        referenceImage: referenceImages.length > 0 ? referenceImages[0] : undefined,
+        id: generateId(), 
+        type: isEditMode ? 'edit' : 'generate', 
+        prompt: fullPrompt,
+        model: selectedModel, 
+        imageUrl, 
+        params: {
+          model: selectedModel, 
+          prompt: fullPrompt,
+          width: aspectRatio.width, 
+          height: aspectRatio.height,
+          seed: actualSeed, 
+          enhance, 
+          safe, 
+          quality: 'high' as const,
+          negativePrompt: fullNegative || undefined,
+          nologo,
+          transparent: transparent && (selectedModel.includes('gptimage')),
+          styleStrength,
+          guidanceScale,
+          steps,
+        }, 
+        createdAt: Date.now(),
+        referenceImage: isEditMode ? referenceImages[0] : undefined,
       };
-      storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 50));
+      storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 30));
 
-      toast.success('Image generated!');
-      setReferenceImages([]);
+      // Clear reference images after successful generation
+      if (isEditMode) {
+        setReferenceImages([]);
+      }
+      
       if (window.innerWidth < 768) setIsSidebarOpen(false);
     } catch (error) {
       console.error('Generation error:', error);
@@ -977,7 +1026,15 @@ export default function SpatialImageEditor() {
         {/* Reference Image */}
         <section className="space-y-3 shrink-0">
           <div className="flex justify-between items-center">
-            <label className="text-sm font-semibold text-zinc-700">Reference Image</label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-semibold text-zinc-700">Reference Image</label>
+              {referenceImages.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[#EF8354]/10 text-[#EF8354] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles size={8} />
+                  Edit Mode
+                </span>
+              )}
+            </div>
             {referenceImages.length > 0 ? (
               <button onClick={() => setReferenceImages([])} className="text-[11px] font-bold text-red-400 hover:text-red-500 uppercase tracking-wider flex items-center gap-1">
                 <Trash2 size={12} /> Clear All
@@ -986,6 +1043,14 @@ export default function SpatialImageEditor() {
               <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">Optional</span>
             )}
           </div>
+          
+          {referenceImages.length > 0 && (
+            <div className="p-3 rounded-xl bg-[#EF8354]/5 border border-[#EF8354]/20">
+              <p className="text-[10px] text-zinc-600 leading-relaxed">
+                <strong className="text-[#EF8354]">Image Edit Mode:</strong> The AI will edit your reference image based on your prompt. Uses /v1/images/edits endpoint.
+              </p>
+            </div>
+          )}
           
           {referenceImages.length > 0 && (
             <div className="grid grid-cols-2 gap-2 mb-3">
