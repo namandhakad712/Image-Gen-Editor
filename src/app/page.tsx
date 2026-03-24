@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
 import { storage, generateId, formatDate } from '@/lib/utils';
 import { HistoryItem, GenerationParams } from '@/types';
+import { ART_STYLES, STYLE_CATEGORIES, ArtStyle } from '@/lib/styles';
+import { generateRandomPrompt, getRandomAppend, processPromptVariables } from '@/lib/prompts';
 
 // =============================================
 //  CONSTANTS
@@ -125,6 +127,13 @@ export default function SpatialImageEditor() {
   const [safe, setSafe] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [models, setModels] = useState(DEFAULT_MODELS);
+  const [selectedStyle, setSelectedStyle] = useState<ArtStyle>(ART_STYLES[0]);
+  const [showStyleSelector, setShowStyleSelector] = useState(false);
+  const [styleCategory, setStyleCategory] = useState<string>('All');
+  
+  // Batch generation
+  const [batchSize, setBatchSize] = useState(1);
+  const [isBatchGenerating, setIsBatchGenerating] = useState(false);
   
   // Advanced parameters
   const [negativePrompt, setNegativePrompt] = useState('');
@@ -280,23 +289,40 @@ export default function SpatialImageEditor() {
     window.location.href = `${BYOP_AUTH_URL}?${params}`;
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (singlePrompt?: string, singleStyle?: ArtStyle) => {
     if (isGenerating) return;
-    if (!prompt.trim()) { toast.error('Please enter a prompt'); return; }
+    const promptToUse = singlePrompt || prompt;
+    const styleToUse = singleStyle || selectedStyle;
+    
+    if (!promptToUse.trim()) { toast.error('Please enter a prompt'); return; }
     if (!hasApiKey) { toast.error('Add your API key in Settings'); return; }
 
     setIsGenerating(true);
     try {
       const actualSeed = seed === -1 ? Math.floor(Math.random() * 999999999) : seed;
-      const fullPrompt = activeModifiers.length > 0
-        ? `${prompt}, ${activeModifiers.map(m => MODIFIER_PROMPTS[m]).join(', ')}` : prompt;
+      
+      // Process style prompt
+      let fullPrompt = promptToUse;
+      if (styleToUse.prompt) {
+        fullPrompt = styleToUse.prompt 
+          ? `${styleToUse.prompt}, ${promptToUse}`
+          : promptToUse;
+      }
+      
+      // Process variables in prompt
+      fullPrompt = processPromptVariables(fullPrompt);
+      
+      // Combine negative prompts
+      const fullNegative = negativePrompt 
+        ? `${styleToUse.negative}${styleToUse.negative && negativePrompt ? ', ' : ''}${negativePrompt}`
+        : styleToUse.negative;
 
       const params: GenerationParams = {
         model: selectedModel, prompt: fullPrompt,
         width: aspectRatio.width, height: aspectRatio.height,
         seed: actualSeed, enhance, safe, quality: 'high' as const,
         image: referenceImages.length > 0 ? referenceImages.join('|') : undefined,
-        negativePrompt: negativePrompt || undefined,
+        negativePrompt: fullNegative || undefined,
         nologo,
         transparent: transparent && (selectedModel.includes('gptimage')),
         styleStrength,
@@ -306,11 +332,11 @@ export default function SpatialImageEditor() {
 
       let imageUrl: string;
       // Use OpenAI endpoint when we have reference images or advanced params
-      if (referenceImages.length > 0 || negativePrompt || nologo || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
+      if (referenceImages.length > 0 || fullNegative || nologo || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
         imageUrl = await pollinationsAPI.generateImageOpenAI({
           prompt: fullPrompt, model: selectedModel,
           seed: actualSeed, enhance, safe,
-          negative_prompt: negativePrompt || undefined,
+          negative_prompt: fullNegative || undefined,
           nologo,
           transparent: transparent && (selectedModel.includes('gptimage')),
           style_strength: styleStrength !== 75 ? styleStrength : undefined,
@@ -357,6 +383,33 @@ export default function SpatialImageEditor() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Batch generate multiple images
+  const handleBatchGenerate = async () => {
+    if (isBatchGenerating || batchSize <= 1) return;
+    setIsBatchGenerating(true);
+    
+    try {
+      for (let i = 0; i < batchSize; i++) {
+        await handleGenerate();
+        // Small delay between generations
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      toast.success(`Generated ${batchSize} images!`);
+    } catch (error) {
+      console.error('Batch generation error:', error);
+      toast.error('Batch generation failed');
+    } finally {
+      setIsBatchGenerating(false);
+    }
+  };
+
+  // Random prompt
+  const handleRandomPrompt = () => {
+    const randomPrompt = generateRandomPrompt();
+    setPrompt(randomPrompt);
+    toast.success('Random prompt loaded!');
   };
 
   const processFiles = (files: File[]) => {
@@ -1146,7 +1199,7 @@ export default function SpatialImageEditor() {
               />
             </div>
             <button
-              onClick={handleGenerate}
+              onClick={(e) => { e.stopPropagation(); handleGenerate(); }}
               disabled={isGenerating}
               className={`text-white px-6 py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0 h-[60px] md:h-16
                 ${isGenerating ? 'bg-zinc-400 shadow-none cursor-not-allowed' : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl hover:shadow-[#EF8354]/30'}`}
