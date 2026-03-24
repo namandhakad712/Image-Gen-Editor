@@ -69,14 +69,15 @@ export default function SpatialImageEditor() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   // Parameters
-  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[0]);
+  const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[5]);
   const [styleStrength, setStyleStrength] = useState(75);
   const [guidanceScale, setGuidanceScale] = useState(7.5);
   const [seed, setSeed] = useState(-1);
   const [steps, setSteps] = useState(30);
-  const [activeModifiers, setActiveModifiers] = useState<string[]>(['High Resolution', 'Studio Lighting', 'Minimalist']);
+  const [activeModifiers, setActiveModifiers] = useState<string[]>([]);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState('flux');
+  const [penColor, setPenColor] = useState('#EF8354');
   const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -325,7 +326,7 @@ export default function SpatialImageEditor() {
 
     const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
     resize();
-    ctx.strokeStyle = '#EF8354'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.strokeStyle = penColor; ctx.lineWidth = 4; ctx.lineCap = 'round';
 
     const coords = (e: MouseEvent | TouchEvent) => {
       const rect = canvas.getBoundingClientRect();
@@ -347,7 +348,7 @@ export default function SpatialImageEditor() {
       canvas.removeEventListener('touchstart', start); canvas.removeEventListener('touchmove', move);
       canvas.removeEventListener('touchend', stop);
     };
-  }, [activeTool]);
+  }, [activeTool, penColor]);
 
   // =============================================
   //  RENDER
@@ -520,6 +521,22 @@ export default function SpatialImageEditor() {
           >
             <PenLine size={18} />
           </button>
+
+          {activeTool === 'pen' && (
+            <>
+              <div className="w-px h-4 bg-zinc-200 mx-1"></div>
+              <div className="flex items-center gap-1.5 px-2">
+                {['#EF8354', '#2D3142', '#4F5D75', '#BFC0C0', '#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].slice(0, 8).map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setPenColor(c)}
+                    className={`w-4 h-4 rounded-full border border-zinc-200 transition-transform ${penColor === c ? 'scale-125 ring-2 ring-[#EF8354]/20' : 'hover:scale-110'}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -583,19 +600,22 @@ export default function SpatialImageEditor() {
                 {!referenceImages.length ? (
                   <div className="text-left">
                     <span className="text-sm font-semibold text-zinc-700 block">Drop images here</span>
-                    <span className="text-xs text-zinc-400">Up to 4 reference images</span>
+                    <span className="text-xs text-zinc-400 leading-none">Up to 4 images</span>
                   </div>
                 ) : (
-                  <span className="text-sm font-semibold text-zinc-700">Add another image</span>
+                  <span className="text-sm font-semibold text-zinc-700">Add more</span>
                 )}
               </div>
             </div>
           )}
-          {referenceImages.length < 4 && (
-             <button onClick={handleAddUrl} className="w-full text-xs font-semibold text-zinc-500 hover:text-[#EF8354] py-1 transition-colors">
-               Or paste image URL
-             </button>
-          )}
+          
+          <button 
+             onClick={(e) => { e.stopPropagation(); handleAddUrl(); }} 
+             className={`w-full text-xs font-semibold py-2.5 rounded-xl border border-zinc-200/50 bg-white/40 hover:bg-[#EF8354]/5 hover:text-[#EF8354] transition-all
+               ${referenceImages.length >= 4 ? 'hidden' : 'block'}`}
+          >
+            Or paste image URL
+          </button>
         </section>
 
         {/* Aspect Ratio */}
