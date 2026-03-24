@@ -135,25 +135,6 @@ pollinations-app/
 
 ---
 
-## 🎯 Available Models
-
-### Image Generation
-| Model | Speed | Quality | Cost |
-|-------|-------|---------|------|
-| **Flux Schnell** | ⚡⚡⚡ | ⭐⭐⭐ | Free |
-| **Z-Image Turbo** | ⚡⚡⚡ | ⭐⭐⭐⭐ | Low |
-| **GPT Image 1.5** | ⚡⚡ | ⭐⭐⭐⭐⭐ | High |
-| **NanoBanana Pro** | ⚡⚡ | ⭐⭐⭐⭐ | Medium |
-| **FLUX.2 Klein** | ⚡ | ⭐⭐⭐⭐⭐ | High |
-
-### Video Generation
-- **Wan 2.6** - High quality video generation
-- **Veo 3.1** - Google's video model
-- **Seedance** - Fast video synthesis
-- **LTX-2** - Extended video generation
-
----
-
 ## 🚀 Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/namandhakad72/Image-Gen-Editor)

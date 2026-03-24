@@ -143,7 +143,7 @@ export default function UsagePage() {
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
-                <History size={16} /> History / Gallery
+                <History size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Video size={16} /> Video Generation

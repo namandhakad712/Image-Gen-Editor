@@ -96,10 +96,7 @@ export default function GalleryPage() {
                 <Wand2 size={16} className="text-[#EF8354]" /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
-                <History size={16} /> History / Gallery
-              </a>
-              <a href="/edit" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
-                <Images size={16} /> Image Editor
+                <History size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
                 <Video size={16} /> Video Generation

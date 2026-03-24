@@ -67,16 +67,17 @@ const DEFAULT_MODELS = [
 // Helper function to filter models by supported endpoints
 function filterModelsByEndpoint(models: any[], endpoint: string): any[] {
   return models.filter(m => 
-    m.supported_endpoints?.includes(endpoint) || 
-    m.output_modalities?.includes('image') ||
-    m.output_modalities?.includes('video')
+    m.supported_endpoints?.includes(endpoint)
   );
 }
 
-// Filter image models (models that support image generation endpoints)
+// Filter image models (models that support BOTH generation AND edits endpoints)
 function getImageModels(models: any[]): any[] {
-  return filterModelsByEndpoint(models, '/image/{prompt}')
-    .filter(m => m.output_modalities?.includes('image'));
+  return models.filter(m => 
+    (m.supported_endpoints?.includes('/image/{prompt}') || 
+     m.supported_endpoints?.includes('/v1/images/generations')) &&
+    m.output_modalities?.includes('image')
+  );
 }
 
 // Filter video models (models that output video)
@@ -769,16 +770,7 @@ export default function SpatialImageEditor() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const resize = () => { 
-      canvas.width = canvas.offsetWidth; 
-      canvas.height = canvas.offsetHeight; 
-      // Redraw all strokes after resize
-      redrawAllStrokes();
-    };
-    resize();
-
     const redrawAllStrokes = () => {
-      if (!ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       penStrokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
@@ -794,6 +786,14 @@ export default function SpatialImageEditor() {
         ctx.stroke();
       });
     };
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      // Redraw all strokes after resize
+      redrawAllStrokes();
+    };
+    resize();
 
     const getCanvasCoords = (e: MouseEvent | TouchEvent) => {
       const rect = canvas.getBoundingClientRect();
@@ -1039,10 +1039,7 @@ export default function SpatialImageEditor() {
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
-                <History size={16} /> History / Gallery
-              </a>
-              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
-                <ImagePlus size={16} /> Image Editor
+                <History size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Video size={16} /> Video Generation

@@ -173,10 +173,7 @@ export default function VideoPage() {
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
-                <History size={16} /> History / Gallery
-              </a>
-              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
-                <ImageIcon size={16} /> Image Editor
+                <History size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
                 <Video size={16} /> Video Generation

@@ -27,51 +27,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [recentImages, setRecentImages] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState({ total: 0, thisWeek: 0, pollenSpent: 0 });
-  
-  // Model settings - fetched live from API
-  const [textModels, setTextModels] = useState<any[]>([]);
-  const [imageModels, setImageModels] = useState<any[]>([]);
-  const [videoModels, setVideoModels] = useState<any[]>([]);
-  const [selectedTextModel, setSelectedTextModel] = useState('openai');
-  const [selectedImageModel, setSelectedImageModel] = useState('flux');
-  const [selectedVideoModel, setSelectedVideoModel] = useState('wan-fast');
-  const [modelsLoading, setModelsLoading] = useState(false);
-
-  // Fetch live models from API
-  const fetchLiveModels = useCallback(async () => {
-    setModelsLoading(true);
-    try {
-      const response = await fetch('https://image.pollinations.ai/models');
-      const data = await response.json();
-      
-      // Filter by supported_endpoints and output_modalities
-      const textModelsFiltered = data.filter((m: any) => 
-        m.supported_endpoints?.includes('/v1/chat/completions') ||
-        m.supported_endpoints?.includes('/text/{prompt}')
-      ).filter((m: any) => m.output_modalities?.includes('text'));
-      
-      const imageModelsFiltered = data.filter((m: any) => 
-        m.supported_endpoints?.includes('/image/{prompt}') ||
-        m.supported_endpoints?.includes('/v1/images/generations')
-      ).filter((m: any) => m.output_modalities?.includes('image'));
-      
-      const videoModelsFiltered = data.filter((m: any) => 
-        m.output_modalities?.includes('video')
-      );
-      
-      setTextModels(textModelsFiltered);
-      setImageModels(imageModelsFiltered);
-      setVideoModels(videoModelsFiltered);
-    } catch (error) {
-      console.error('Failed to fetch models:', error);
-    } finally {
-      setModelsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLiveModels();
-  }, [fetchLiveModels]);
 
   // Load data with caching
   const loadAllData = useCallback(async () => {
@@ -203,10 +158,7 @@ export default function SettingsPage() {
                 <Wand2 size={16} className="text-[#EF8354]" /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
-                <History size={16} /> History / Gallery
-              </a>
-              <a href="/edit" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
-                <ImagePlus size={16} /> Image Editor
+                <History size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
                 <Video size={16} /> Video Generation
@@ -308,7 +260,7 @@ export default function SettingsPage() {
                   <p className="text-[10px] font-semibold text-green-400 uppercase mt-1">This Week</p>
                 </div>
                 <div className="text-center p-4 rounded-2xl bg-gradient-to-br from-[#EF8354]/10 to-[#EF8354]/20">
-                  <p className="text-2xl font-bold text-[#EF8354]">{balance !== null ? balance.toFixed(1) : '--'}</p>
+                  <p className="text-2xl font-bold text-[#EF8354]">{balance !== null ? balance.toFixed(3) : '--'}</p>
                   <p className="text-[10px] font-semibold text-[#EF8354]/70 uppercase mt-1">Pollen Left</p>
                 </div>
               </div>
@@ -371,103 +323,6 @@ export default function SettingsPage() {
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Model Settings - Text Models */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
-                  <Wand2 size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-zinc-800">Text Model</h3>
-                  <p className="text-xs text-zinc-400">For prompt enhancement</p>
-                </div>
-              </div>
-              <button
-                onClick={fetchLiveModels}
-                disabled={modelsLoading}
-                className="p-2 hover:bg-zinc-100 rounded-full transition-all"
-              >
-                <RefreshCw size={16} className={modelsLoading ? 'animate-spin' : ''} />
-              </button>
-            </div>
-            <select
-              value={selectedTextModel}
-              onChange={e => setSelectedTextModel(e.target.value)}
-              className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
-            >
-              {textModels.map(m => (
-                <option key={m.id} value={m.id}>{m.description || m.id}</option>
-              ))}
-            </select>
-            <p className="text-[10px] text-zinc-400 mt-2">
-              Used for enhancing prompts before image/video generation
-            </p>
-          </div>
-
-          {/* Model Settings - Image Models */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white shadow-lg">
-                  <ImagePlus size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-zinc-800">Image Models</h3>
-                  <p className="text-xs text-zinc-400">Live from API</p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-              {imageModels.slice(0, 8).map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setSelectedImageModel(m.id)}
-                  className={`w-full p-2 rounded-lg text-left text-xs transition-all ${
-                    selectedImageModel === m.id
-                      ? 'bg-[#EF8354]/10 border border-[#EF8354] text-[#EF8354]'
-                      : 'bg-zinc-50 border border-zinc-200 hover:border-[#EF8354]/50'
-                  }`}
-                >
-                  <span className="font-semibold">{m.description || m.id}</span>
-                </button>
-              ))}
-              {imageModels.length > 8 && (
-                <p className="text-[10px] text-zinc-400 text-center">+{imageModels.length - 8} more models available</p>
-              )}
-            </div>
-          </div>
-
-          {/* Model Settings - Video Models */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center text-white shadow-lg">
-                  <Video size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-zinc-800">Video Models</h3>
-                  <p className="text-xs text-zinc-400">Live from API</p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-              {videoModels.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => setSelectedVideoModel(m.id)}
-                  className={`w-full p-2 rounded-lg text-left text-xs transition-all ${
-                    selectedVideoModel === m.id
-                      ? 'bg-[#EF8354]/10 border border-[#EF8354] text-[#EF8354]'
-                      : 'bg-zinc-50 border border-zinc-200 hover:border-[#EF8354]/50'
-                  }`}
-                >
-                  <span className="font-semibold">{m.description || m.id}</span>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Quick Actions */}

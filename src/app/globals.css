@@ -23,29 +23,44 @@ body {
 }
 
 /* ==============================
-   GLASS PANELS
+   GLASS PANELS - Enhanced Gaussian Blur
    ============================== */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(40px) saturate(140%);
-  -webkit-backdrop-filter: blur(40px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.1),
-    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(60px) saturate(180%) brightness(105%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%) brightness(105%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 
+    0 32px 64px -16px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 8px 32px rgba(0, 0, 0, 0.04);
 }
 
 .glass-pill {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(30px) saturate(120%);
-  -webkit-backdrop-filter: blur(30px) saturate(120%);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(50px) saturate(160%) brightness(102%);
+  -webkit-backdrop-filter: blur(50px) saturate(160%) brightness(102%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
 
 .glass-overlay {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(20px) saturate(130%);
-  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+}
+
+/* Extra frosted glass for modals */
+.glass-frosted {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(80px) saturate(200%) brightness(103%);
+  -webkit-backdrop-filter: blur(80px) saturate(200%) brightness(103%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 
+    0 40px 80px -20px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
 }
 
 /* ==============================
@@ -296,4 +311,91 @@ input[type=range]::-moz-range-track {
 
 .animate-slide-down {
   animation: slideDown 0.2s ease-out;
+}
+
+/* ==============================
+   MOBILE RESPONSIVENESS
+   ============================== */
+@media (max-width: 768px) {
+  /* Bottom panel adjustments */
+  .glass-panel.rounded-t-\[32px\] {
+    border-radius: 24px 24px 0 0 !important;
+  }
+  
+  /* Sidebar adjustments */
+  aside {
+    width: 100% !important;
+    max-width: none !important;
+    left: 0 !important;
+    right: 0 !important;
+    margin: 0 16px !important;
+    bottom: 100px !important;
+  }
+  
+  /* Canvas images - better touch targets */
+  .canvas-transform img {
+    touch-action: none;
+  }
+  
+  /* Larger touch targets for buttons */
+  button {
+    min-height: 44px;
+  }
+  
+  /* Adjust font sizes for mobile */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+  
+  h2 {
+    font-size: 1.25rem !important;
+  }
+  
+  /* Full-width modals on mobile */
+  .glass-panel.max-w-2xl,
+  .glass-panel.max-w-md,
+  .glass-panel.max-w-4xl {
+    max-width: calc(100vw - 32px) !important;
+    margin: 0 16px !important;
+  }
+  
+  /* Bottom sheet style for modals */
+  @media (max-height: 600px) {
+    .glass-panel.rounded-t-3xl,
+    .glass-panel.rounded-t-\[32px\] {
+      max-height: 85vh !important;
+    }
+  }
+}
+
+/* Ultra small screens */
+@media (max-width: 375px) {
+  .glass-pill {
+    padding: 8px !important;
+  }
+  
+  button span {
+    display: none;
+  }
+  
+  button svg {
+    margin: 0 auto;
+  }
+}
+
+/* Landscape mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  aside {
+    top: 60px !important;
+    bottom: 80px !important;
+  }
+  
+  .bottom-panel {
+    padding: 8px !important;
+  }
+  
+  textarea {
+    height: 40px !important;
+    min-height: 40px !important;
+  }
 }

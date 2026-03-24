@@ -21,8 +21,8 @@ export default function HistoryPage() {
   }, []);
 
   const filteredHistory = history.filter(item =>
-    item.prompt.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.model.toLowerCase().includes(searchQuery.toLowerCase())
+    item.prompt?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.model?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleDelete = (id: string) => {
@@ -79,10 +79,7 @@ export default function HistoryPage() {
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
-                <HistoryIcon size={16} /> History / Gallery
-              </a>
-              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
-                <ImagePlus size={16} /> Image Editor
+                <HistoryIcon size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Video size={16} /> Video Generation
@@ -112,7 +109,7 @@ export default function HistoryPage() {
                   <HistoryIcon size={18} />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold text-zinc-800">History</h1>
+                  <h1 className="text-lg font-bold text-zinc-800">My Generations</h1>
                   <p className="text-xs text-zinc-400">{history.length} images</p>
                 </div>
               </div>
