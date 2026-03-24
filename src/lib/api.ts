@@ -175,8 +175,29 @@ export class PollinationsAPI {
 
     console.log('📸 Edit Image URL:', imageUrl);
 
-    // Return the image URL (browser will load it as an <img> src)
-    return imageUrl;
+    // For image editing, we need to fetch the actual image blob and create a blob URL
+    // because the GET endpoint returns the image directly, not a JSON response
+    try {
+      const response = await fetch(imageUrl, {
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Get the image as blob and create object URL
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      console.log('✅ Edit complete, blob URL created:', blobUrl);
+      
+      return blobUrl;
+    } catch (error) {
+      console.error('Image edit fetch error:', error);
+      // If fetch fails, return the original URL as fallback
+      return imageUrl;
+    }
   }
 
   async uploadImage(file: File): Promise<string> {

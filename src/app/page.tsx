@@ -439,12 +439,26 @@ export default function SpatialImageEditor() {
 
       if (isEditMode) {
         // IMAGE EDIT MODE - Uses GET /image/{prompt} with image parameter
+        // Must use an IMAGE model (not text models like nova-fast)
         console.log('🎨 EDIT MODE');
         console.log('📷 Reference images:', referenceImages);
         console.log('📝 Prompt:', fullPrompt);
         
+        // For editing, use a model that supports image input
+        const editModel = selectedModel.includes('gptimage') || 
+                         selectedModel.includes('nanobanana') || 
+                         selectedModel.includes('kontext') ||
+                         selectedModel.includes('seedream') ||
+                         selectedModel.includes('klein') ||
+                         selectedModel.includes('flux') ||
+                         selectedModel.includes('zimage')
+          ? selectedModel 
+          : 'flux'; // Default to flux for editing
+          
+        console.log('🔧 Using edit model:', editModel);
+        
         imageUrl = await pollinationsAPI.editImage({
-          model: selectedModel,
+          model: editModel,
           prompt: fullPrompt,
           image: referenceImages.join('|'),
           seed: actualSeed,
