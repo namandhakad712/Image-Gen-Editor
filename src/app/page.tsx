@@ -576,29 +576,49 @@ export default function SpatialImageEditor() {
     toast.success('Random prompt loaded!');
   };
 
-  const processFiles = (files: File[]) => {
+  const processFiles = async (files: File[]) => {
     const availableSlots = 4 - referenceImages.length;
     const filesToUpload = files.slice(0, availableSlots);
-    
+
     if (filesToUpload.length === 0) {
       if (files.length > 0) toast.error('Maximum 4 reference images allowed');
       return;
     }
 
-    filesToUpload.forEach(file => {
+    // Upload each file to Pollinations media storage and get URL
+    for (const file of filesToUpload) {
       if (!file.type.startsWith('image/')) {
         toast.error('Only images are allowed');
-        return;
+        continue;
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setReferenceImages(prev => {
-          if (prev.length >= 4) return prev;
-          return [...prev, event.target?.result as string];
-        });
-      };
-      reader.readAsDataURL(file);
-    });
+
+      try {
+        toast.loading('Uploading image...', { id: `upload-${file.name}` });
+        const imageUrl = await pollinationsAPI.uploadImage(file);
+        
+        if (imageUrl) {
+          setReferenceImages(prev => {
+            if (prev.length >= 4) return prev;
+            return [...prev, imageUrl];
+          });
+          toast.success('Image uploaded!', { id: `upload-${file.name}` });
+        } else {
+          toast.error('Upload failed', { id: `upload-${file.name}` });
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast.error('Upload failed - using local preview', { id: `upload-${file.name}` });
+        // Fallback: use local FileReader for preview
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setReferenceImages(prev => {
+            if (prev.length >= 4) return prev;
+            return [...prev, event.target?.result as string];
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

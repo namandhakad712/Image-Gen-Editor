@@ -151,26 +151,31 @@ export class PollinationsAPI {
   }
 
   async editImage(params: GenerationParams & { image: string }): Promise<string> {
-    const { model, prompt, image, seed, enhance, safe, negativePrompt, nologo, transparent } = params;
+    const { model, prompt, image, seed, enhance, safe, negativePrompt, nologo, transparent, width, height } = params;
 
-    // Use OpenAI-compatible endpoint for image editing
-    const response = await fetch(`${BASE_URL}/v1/images/edits`, {
-      method: 'POST',
-      headers: {
-        ...this.getHeaders(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt,
-        image,
-        model: model || 'flux',
-        seed,
-        enhance,
-        safe,
-        negative_prompt: negativePrompt,
-        nologo,
-        transparent,
-      }),
+    // Use GET /image/{prompt} endpoint with image query parameter for editing
+    // This is the correct endpoint according to Pollinations API docs
+    const urlParams = new URLSearchParams();
+    urlParams.set('model', model || 'flux');
+    urlParams.set('seed', seed.toString());
+    urlParams.set('width', (width || 1024).toString());
+    urlParams.set('height', (height || 1024).toString());
+    
+    if (enhance) urlParams.set('enhance', 'true');
+    if (safe) urlParams.set('safe', 'true');
+    if (negativePrompt) urlParams.set('negative_prompt', negativePrompt);
+    if (nologo) urlParams.set('nologo', 'true');
+    if (transparent) urlParams.set('transparent', 'true');
+    
+    // Image parameter for editing - should be URL(s)
+    urlParams.set('image', image);
+
+    const encodedPrompt = encodeURIComponent(prompt);
+    const imageUrl = `${BASE_URL}/image/${encodedPrompt}?${urlParams.toString()}`;
+
+    // Fetch the edited image
+    const response = await fetch(imageUrl, {
+      headers: this.getHeaders(),
     });
 
     if (!response.ok) {
@@ -185,8 +190,29 @@ export class PollinationsAPI {
       throw new Error(errorData.error.message);
     }
 
+    // Return the image URL
+    return imageUrl;
+  }
+
+  async uploadImage(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('https://media.pollinations.ai/upload', {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Failed to upload image',
+      }));
+      throw new Error(errorData.error || 'Failed to upload image');
+    }
+
     const data = await response.json();
-    return data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
+    return data.url || data.imageUrl || '';
   }
 
   async generateImageOpenAI(params: {
