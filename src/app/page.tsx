@@ -6,7 +6,8 @@ import {
   ImagePlus, ChevronDown, ChevronsLeft, Sparkles, Plus,
   SlidersHorizontal, Menu, X, Loader2, Trash2, Check,
   Eye, EyeOff, Download, LogIn, Key, ExternalLink,
-  History, Image, Wand2, ChevronRight, Video, BarChart3
+  History, Image, Wand2, ChevronRight, Video, BarChart3,
+  RotateCcw, RotateCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
@@ -26,9 +27,19 @@ const ASPECT_RATIOS = [
 ];
 
 const ALL_MODIFIERS = [
-  'High Resolution', 'Studio Lighting', 'Minimalist', 'Cinematic',
-  'Octane Render', 'Volumetric', 'Macro',
+  { label: 'High Resolution', prompt: 'masterpiece, best quality, ultra-detailed, 8K resolution, photorealistic, sharp focus' },
+  { label: 'Studio Lighting', prompt: 'professional studio lighting, softbox lighting, dramatic shadows, three-point lighting' },
+  { label: 'Minimalist', prompt: 'minimalist composition, clean lines, simple background, negative space, less is more' },
+  { label: 'Cinematic', prompt: 'cinematic lighting, movie still, dramatic atmosphere, color graded, anamorphic lens' },
+  { label: 'Octane Render', prompt: 'octane render, unreal engine 5, ray tracing, global illumination, photorealistic 3D' },
+  { label: 'Volumetric', prompt: 'volumetric lighting, god rays, atmospheric lighting, light beams, fog and mist' },
+  { label: 'Macro', prompt: 'macro photography, extreme close-up, shallow depth of field, detailed texture, bokeh' },
 ];
+
+const MODIFIER_PROMPTS = ALL_MODIFIERS.reduce((acc, m) => {
+  acc[m.label] = m.prompt;
+  return acc;
+}, {} as Record<string, string>);
 
 const DEFAULT_MODELS = [
   { value: 'flux', label: 'Flux Schnell' },
@@ -77,6 +88,18 @@ export default function SpatialImageEditor() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+
+  // Pen drawing state
+  const [penStrokes, setPenStrokes] = useState<Array<{
+    id: string;
+    points: { x: number; y: number }[];
+    color: string;
+    imageId?: string;
+  }>>([]);
+  const [penHistory, setPenHistory] = useState<Array<typeof penStrokes>>([]);
+  const [penHistoryIndex, setPenHistoryIndex] = useState(-1);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[]>([]);
 
   // Parameters
   const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[5]);
@@ -182,6 +205,63 @@ export default function SpatialImageEditor() {
     return () => container.removeEventListener('wheel', handleWheel);
   }, []);
 
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const panSpeed = 50 / zoom;
+      
+      // Arrow keys for panning
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPan(prev => ({ ...prev, y: prev.y + panSpeed }));
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setPan(prev => ({ ...prev, y: prev.y - panSpeed }));
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setPan(prev => ({ ...prev, x: prev.x + panSpeed }));
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setPan(prev => ({ ...prev, x: prev.x - panSpeed }));
+      }
+      // Zoom with +/- keys
+      else if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        setZoom(prev => Math.min(5, prev + 0.1));
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        setZoom(prev => Math.max(0.1, prev - 0.1));
+      }
+      // Undo/Redo with Ctrl+Z / Ctrl+Shift+Z
+      else if (e.ctrlKey && e.key === 'z' && activeTool === 'pen') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redoPenStroke();
+        } else {
+          undoPenStroke();
+        }
+      }
+      // Delete selected image
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedImageId && activeTool === 'pointer') {
+          e.preventDefault();
+          deleteImage(selectedImageId);
+        }
+      }
+      // Escape to deselect
+      else if (e.key === 'Escape') {
+        setSelectedImageId(null);
+        setActiveTool('pointer');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoom, activeTool, selectedImageId, penHistory, penHistoryIndex]);
+
   // =============================================
   //  HANDLERS
   // =============================================
@@ -199,7 +279,7 @@ export default function SpatialImageEditor() {
     try {
       const actualSeed = seed === -1 ? Math.floor(Math.random() * 999999999) : seed;
       const fullPrompt = activeModifiers.length > 0
-        ? `${prompt}, ${activeModifiers.join(', ')}` : prompt;
+        ? `${prompt}, ${activeModifiers.map(m => MODIFIER_PROMPTS[m]).join(', ')}` : prompt;
 
       const params: GenerationParams = {
         model: selectedModel, prompt: fullPrompt,
@@ -231,13 +311,18 @@ export default function SpatialImageEditor() {
         imageUrl = await pollinationsAPI.generateImage(params);
       }
 
-      // Place image on canvas at center of current view
-      const centerX = (-pan.x + window.innerWidth / 2) / zoom - aspectRatio.width / 2;
-      const centerY = (-pan.y + window.innerHeight / 2) / zoom - aspectRatio.height / 2;
+      // Place image on canvas with staggered position to avoid overlap
+      const viewportCenterX = (-pan.x + window.innerWidth / 2) / zoom;
+      const viewportCenterY = (-pan.y + window.innerHeight / 2) / zoom;
+      
+      // Calculate offset based on number of existing images
+      const offset = canvasImages.length * 50;
+      const staggeredX = viewportCenterX - aspectRatio.width / 2 + (offset % 300);
+      const staggeredY = viewportCenterY - aspectRatio.height / 2 + Math.floor(offset / 300) * 50;
 
       const newImg = {
         id: generateId(), url: imageUrl,
-        x: centerX, y: centerY,
+        x: staggeredX, y: staggeredY,
         width: aspectRatio.width, height: aspectRatio.height,
         prompt: fullPrompt,
       };
@@ -315,9 +400,45 @@ export default function SpatialImageEditor() {
   };
 
   const toggleModifier = (mod: string) => {
-    setActiveModifiers(prev =>
-      prev.includes(mod) ? prev.filter(m => m !== mod) : [...prev, mod]
-    );
+    setActiveModifiers(prev => {
+      if (prev.includes(mod)) {
+        return prev.filter(m => m !== mod);
+      } else {
+        // Insert the modifier's prompt directly into the main prompt
+        setPrompt(currentPrompt => {
+          if (currentPrompt.includes(MODIFIER_PROMPTS[mod])) {
+            return currentPrompt;
+          }
+          return currentPrompt ? `${currentPrompt}, ${MODIFIER_PROMPTS[mod]}` : MODIFIER_PROMPTS[mod];
+        });
+        return [...prev, mod];
+      }
+    });
+  };
+
+  // Undo/Redo for pen strokes
+  const undoPenStroke = () => {
+    if (penHistoryIndex >= 0) {
+      const newHistory = penHistory.slice(0, penHistoryIndex);
+      setPenStrokes(newHistory[penHistoryIndex] || []);
+      setPenHistoryIndex(prev => prev - 1);
+    }
+  };
+
+  const redoPenStroke = () => {
+    if (penHistoryIndex < penHistory.length - 1) {
+      const newIndex = penHistoryIndex + 1;
+      setPenStrokes(penHistory[newIndex] || []);
+      setPenHistoryIndex(newIndex);
+    }
+  };
+
+  // Save pen stroke to history
+  const savePenStroke = (strokes: typeof penStrokes) => {
+    const newHistory = penHistory.slice(0, penHistoryIndex + 1);
+    newHistory.push(strokes);
+    setPenHistory(newHistory);
+    setPenHistoryIndex(newHistory.length - 1);
   };
 
   const downloadImage = async (url: string, id: string) => {
@@ -343,40 +464,111 @@ export default function SpatialImageEditor() {
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
   // =============================================
-  //  DRAWING LOGIC
+  //  DRAWING LOGIC (with undo/redo and image support)
   // =============================================
   useEffect(() => {
     if (activeTool !== 'pen' || !drawingCanvasRef.current) return;
     const canvas = drawingCanvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    let drawing = false;
 
-    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    const resize = () => { 
+      canvas.width = canvas.offsetWidth; 
+      canvas.height = canvas.offsetHeight; 
+      // Redraw all strokes after resize
+      redrawAllStrokes();
+    };
     resize();
-    ctx.strokeStyle = penColor; ctx.lineWidth = 4; ctx.lineCap = 'round';
 
-    const coords = (e: MouseEvent | TouchEvent) => {
+    const redrawAllStrokes = () => {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      penStrokes.forEach(stroke => {
+        if (stroke.points.length < 2) return;
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+        for (let i = 1; i < stroke.points.length; i++) {
+          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+        }
+        ctx.stroke();
+      });
+    };
+
+    const getCanvasCoords = (e: MouseEvent | TouchEvent) => {
       const rect = canvas.getBoundingClientRect();
       const cx = 'touches' in e ? e.touches[0]?.clientX : e.clientX;
       const cy = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
-      return { x: (cx || 0) - rect.left, y: (cy || 0) - rect.top };
+      return { 
+        x: (cx || 0) - rect.left, 
+        y: (cy || 0) - rect.top 
+      };
     };
-    const start = (e: MouseEvent | TouchEvent) => { drawing = true; const c = coords(e); ctx.beginPath(); ctx.moveTo(c.x, c.y); };
-    const stop = () => { drawing = false; ctx.beginPath(); };
-    const move = (e: MouseEvent | TouchEvent) => { if (!drawing) return; const c = coords(e); ctx.lineTo(c.x, c.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(c.x, c.y); };
 
-    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move);
-    canvas.addEventListener('mouseup', stop); canvas.addEventListener('mouseout', stop);
-    canvas.addEventListener('touchstart', start); canvas.addEventListener('touchmove', move);
-    canvas.addEventListener('touchend', stop);
-    return () => {
-      canvas.removeEventListener('mousedown', start); canvas.removeEventListener('mousemove', move);
-      canvas.removeEventListener('mouseup', stop); canvas.removeEventListener('mouseout', stop);
-      canvas.removeEventListener('touchstart', start); canvas.removeEventListener('touchmove', move);
-      canvas.removeEventListener('touchend', stop);
+    const startDrawing = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      setIsDrawing(true);
+      const point = getCanvasCoords(e);
+      setCurrentStroke([point]);
+      
+      ctx.strokeStyle = penColor;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
     };
-  }, [activeTool, penColor]);
+
+    const draw = (e: MouseEvent | TouchEvent) => {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const point = getCanvasCoords(e);
+      setCurrentStroke(prev => [...prev, point]);
+      
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
+    };
+
+    const stopDrawing = () => {
+      if (!isDrawing) return;
+      setIsDrawing(false);
+      
+      if (currentStroke.length > 0) {
+        const newStroke = {
+          id: generateId(),
+          points: currentStroke,
+          color: penColor,
+          imageId: selectedImageId || undefined,
+        };
+        const newStrokes = [...penStrokes, newStroke];
+        setPenStrokes(newStrokes);
+        savePenStroke(newStrokes);
+      }
+      setCurrentStroke([]);
+      ctx.beginPath();
+    };
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing);
+    
+    return () => {
+      canvas.removeEventListener('mousedown', startDrawing);
+      canvas.removeEventListener('mousemove', draw);
+      canvas.removeEventListener('mouseup', stopDrawing);
+      canvas.removeEventListener('mouseout', stopDrawing);
+      canvas.removeEventListener('touchstart', startDrawing);
+      canvas.removeEventListener('touchmove', draw);
+      canvas.removeEventListener('touchend', stopDrawing);
+    };
+  }, [activeTool, penColor, isDrawing, currentStroke, penStrokes, selectedImageId]);
 
   // =============================================
   //  RENDER
@@ -400,35 +592,60 @@ export default function SpatialImageEditor() {
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         >
           {/* Canvas Images */}
-          {canvasImages.map((img) => (
+          {canvasImages.map((img, index) => (
             <div
               key={img.id}
-              className={`absolute group transition-shadow duration-200 ${selectedImageId === img.id ? 'ring-3 ring-[#EF8354] ring-offset-4 ring-offset-white/50' : 'hover:ring-2 hover:ring-[#EF8354]/30'}`}
-              style={{ left: img.x, top: img.y, width: img.width, height: img.height }}
+              className={`absolute group transition-all duration-300 ${
+                selectedImageId === img.id 
+                  ? 'ring-4 ring-[#EF8354] ring-offset-3 ring-offset-white/30 shadow-2xl shadow-[#EF8354]/20' 
+                  : 'hover:ring-2 hover:ring-[#EF8354]/40 hover:shadow-xl'
+              }`}
+              style={{ 
+                left: img.x, 
+                top: img.y, 
+                width: img.width, 
+                height: img.height,
+                zIndex: selectedImageId === img.id ? 50 : index,
+              }}
               onClick={(e) => { e.stopPropagation(); if (activeTool === 'pointer') setSelectedImageId(img.id); }}
             >
-              <img src={img.url} alt={img.prompt} className="w-full h-full object-cover rounded-2xl shadow-2xl" draggable={false} />
+              <img 
+                src={img.url} 
+                alt={img.prompt} 
+                className="w-full h-full object-cover rounded-2xl shadow-lg backdrop-blur-sm" 
+                draggable={false} 
+              />
 
-              {/* Hover actions */}
-              <div className="absolute -top-12 right-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Hover actions - responsive size based on image */}
+              <div className={`absolute -top-3 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
+                img.width < 400 ? 'scale-75' : img.width < 800 ? 'scale-90' : 'scale-100'
+              }`}>
                 <button
                   onClick={(e) => { e.stopPropagation(); downloadImage(img.url, img.id); }}
-                  className="p-2 rounded-xl glass-pill text-zinc-600 hover:text-[#EF8354] transition-colors"
+                  className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:text-[#EF8354] hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md"
                 >
-                  <Download size={14} />
+                  <Download size={12} />
+                  <span className="hidden sm:inline">Download</span>
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteImage(img.id); }}
-                  className="p-2 rounded-xl glass-pill text-zinc-600 hover:text-red-500 transition-colors"
+                  className="p-1.5 rounded-full glass-panel text-zinc-600 hover:text-red-500 hover:bg-red-50/80 transition-all shadow-lg backdrop-blur-md"
                 >
                   <Trash2 size={14} />
                 </button>
               </div>
 
               {/* Dimension badge */}
-              <div className="absolute bottom-2 left-2 px-2 py-1 rounded-lg glass-pill text-[10px] font-semibold text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-full glass-panel text-[10px] font-semibold text-zinc-600 opacity-0 group-hover:opacity-100 transition-all backdrop-blur-md shadow-md">
                 {img.width}×{img.height}
               </div>
+
+              {/* Selection indicator */}
+              {selectedImageId === img.id && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#EF8354] text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
+                  Selected
+                </div>
+              )}
             </div>
           ))}
 
@@ -436,8 +653,14 @@ export default function SpatialImageEditor() {
           {activeTool === 'pen' && (
             <canvas
               ref={drawingCanvasRef}
-              className="absolute touch-none"
-              style={{ left: -5000, top: -5000, width: 10000, height: 10000 }}
+              className="absolute touch-none pointer-events-none"
+              style={{ 
+                left: -5000, 
+                top: -5000, 
+                width: 10000, 
+                height: 10000,
+                zIndex: 100,
+              }}
             />
           )}
         </div>
@@ -582,7 +805,7 @@ export default function SpatialImageEditor() {
         <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed top-20 bottom-44 md:top-24 md:bottom-24 left-4 md:left-6 w-[300px] md:w-[320px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-5 custom-scrollbar overflow-y-auto transition-transform duration-300 ease-out
+      <aside className={`fixed top-20 bottom-56 md:top-24 md:bottom-40 left-4 md:left-6 w-[300px] md:w-[320px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-5 custom-scrollbar overflow-y-auto transition-transform duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:translate-x-0'}`}>
 
         <header className="flex items-center justify-between pb-1 shrink-0">
@@ -771,49 +994,80 @@ export default function SpatialImageEditor() {
       {/* =========================================
           BOTTOM PANEL: PROMPT & GENERATE
       ========================================= */}
-      <div className="fixed bottom-4 md:bottom-6 left-4 right-4 md:left-[360px] md:right-6 glass-panel rounded-[24px] md:rounded-3xl p-3 md:p-5 z-40 flex flex-col gap-3 md:gap-4 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] max-w-4xl mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
+        <div className="glass-panel rounded-t-[32px] rounded-b-none p-4 md:p-6 w-full max-w-4xl mx-auto pointer-events-auto shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] backdrop-blur-xl bg-white/70 border-t border-white/20">
 
-        <div className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4">
-          <div className="flex-1 relative bg-white/40 md:bg-transparent rounded-2xl md:rounded-none p-3 md:p-0">
-            <textarea
-              className="w-full bg-transparent resize-none text-zinc-700 text-sm md:text-base leading-relaxed focus:outline-none placeholder:text-zinc-400 h-20 md:h-16 prompt-scrollbar"
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              placeholder="Describe what you want to see..."
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
-            />
-          </div>
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className={`text-white px-6 py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0 h-[60px] md:h-16
-              ${isGenerating ? 'bg-zinc-400 shadow-none cursor-not-allowed' : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl hover:shadow-[#EF8354]/30'}`}
-          >
-            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-            {isGenerating ? 'Synthesizing...' : 'Generate'}
-          </button>
-        </div>
+          {/* Pen tools - show when pen is active */}
+          {activeTool === 'pen' && (
+            <div className="flex items-center justify-center gap-2 mb-3 pb-3 border-b border-zinc-200/50">
+              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mr-2">Drawing Tools:</span>
+              <button
+                onClick={undoPenStroke}
+                disabled={penHistoryIndex < 0}
+                className="px-3 py-1.5 rounded-full bg-zinc-100/80 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 text-xs font-semibold text-zinc-600"
+              >
+                <RotateCcw size={12} />
+                Undo
+              </button>
+              <button
+                onClick={redoPenStroke}
+                disabled={penHistoryIndex >= penHistory.length - 1}
+                className="px-3 py-1.5 rounded-full bg-zinc-100/80 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 text-xs font-semibold text-zinc-600"
+              >
+                <RotateCw size={12} />
+                Redo
+              </button>
+              <button
+                onClick={() => { setPenStrokes([]); setPenHistory([]); setPenHistoryIndex(-1); toast.success('Canvas cleared'); }}
+                className="px-3 py-1.5 rounded-full bg-red-100/80 hover:bg-red-200 transition-all flex items-center gap-1.5 text-xs font-semibold text-red-600"
+              >
+                <Trash2 size={12} />
+                Clear All
+              </button>
+              <div className="w-px h-4 bg-zinc-200 mx-2"></div>
+              <span className="text-[10px] font-medium text-zinc-400">Draw on images to mark edit areas</span>
+            </div>
+          )}
 
-        {/* Modifiers row */}
-        <div className="flex items-center justify-between pt-2 border-t border-zinc-200/50">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar w-full md:w-auto">
-            <span className="text-xs font-semibold text-zinc-400 mr-1 uppercase tracking-wide shrink-0">Modifiers:</span>
-            {ALL_MODIFIERS.map(mod => {
-              const isActive = activeModifiers.includes(mod);
-              return (
-                <button key={mod} onClick={() => toggleModifier(mod)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm whitespace-nowrap transition-colors border shrink-0
-                    ${isActive ? 'bg-[#EF8354]/10 text-[#EF8354] border-[#EF8354]/30' : 'bg-white text-zinc-600 border-zinc-200 hover:border-[#EF8354]/50'}`}
-                >
-                  {isActive && <Check size={12} strokeWidth={3} />}
-                  {mod}
-                </button>
-              );
-            })}
+          <div className="flex flex-col md:flex-row items-stretch md:items-start gap-3 md:gap-4">
+            <div className="flex-1 relative bg-white/40 md:bg-transparent rounded-2xl md:rounded-none p-3 md:p-0">
+              <textarea
+                className="w-full bg-transparent resize-none text-zinc-700 text-sm md:text-base leading-relaxed focus:outline-none placeholder:text-zinc-400 h-20 md:h-16 prompt-scrollbar"
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                placeholder="Describe what you want to see..."
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
+              />
+            </div>
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className={`text-white px-6 py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0 h-[60px] md:h-16
+                ${isGenerating ? 'bg-zinc-400 shadow-none cursor-not-allowed' : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl hover:shadow-[#EF8354]/30'}`}
+            >
+              {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+              {isGenerating ? 'Synthesizing...' : 'Generate'}
+            </button>
           </div>
-          <button className="hidden md:flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-[#EF8354] transition-colors whitespace-nowrap pl-4 shrink-0 border-l border-zinc-200 ml-2">
-            <Plus size={14} /> Add Style
-          </button>
+
+          {/* Modifiers row */}
+          <div className="flex items-center justify-between pt-3 border-t border-zinc-200/50">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar w-full md:w-auto">
+              <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide shrink-0">Style:</span>
+              {ALL_MODIFIERS.map(mod => {
+                const isActive = activeModifiers.includes(mod.label);
+                return (
+                  <button key={mod.label} onClick={() => toggleModifier(mod.label)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm whitespace-nowrap transition-all border shrink-0 backdrop-blur-sm
+                      ${isActive ? 'bg-[#EF8354] text-white border-[#EF8354] shadow-md' : 'bg-white/60 text-zinc-600 border-zinc-200 hover:border-[#EF8354]/50 hover:bg-white/80'}`}
+                  >
+                    {isActive && <Check size={10} strokeWidth={3} />}
+                    {mod.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
