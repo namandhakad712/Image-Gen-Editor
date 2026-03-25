@@ -280,6 +280,23 @@ export default function SpatialImageEditor() {
       }).catch(err => console.error('Failed to fetch models:', err));
   }, []);
 
+  // Guarantee that when reference images are present, an image-editing model is selected
+  useEffect(() => {
+    if (referenceImages.length > 0 && Object.keys(rawModelData).length > 0) {
+      const modelData = rawModelData[selectedModel];
+      const supportsImageInput = modelData?.input_modalities?.includes('image');
+      
+      if (!supportsImageInput) {
+        // Find the first model that supports image editing
+        const firstEditModel = models.find(m => rawModelData[m.value]?.input_modalities?.includes('image'));
+        if (firstEditModel) {
+          setSelectedModel(firstEditModel.value);
+          toast.info(`Switched to ${firstEditModel.label} for image editing.`);
+        }
+      }
+    }
+  }, [referenceImages, selectedModel, rawModelData, models]);
+
   // =============================================
   //  BYOP: Grab API key from URL hash on load
   // =============================================
@@ -479,33 +496,20 @@ export default function SpatialImageEditor() {
         console.log('🎨 EDIT MODE');
         console.log('📷 Reference images:', referenceImages);
         console.log('📝 Prompt:', fullPrompt);
+        console.log('🔧 Using selected model:', selectedModel);
         
-        // Check if the selected model supports image input for editing
-        // Models with input_modalities: ["text"] only will IGNORE the reference image
+        // Ensure the selected model actually supports image editing
         const modelData = rawModelData[selectedModel];
         const supportsImageInput = modelData?.input_modalities?.includes('image');
-        let editModel = selectedModel;
         
         if (!supportsImageInput) {
-          // Auto-switch to a model that accepts image input
-          // Prefer gptimage (free), then kontext, then klein
-          const editFallbacks = ['gptimage', 'kontext', 'klein', 'qwen-image', 'nanobanana', 'seedream5', 'p-image-edit', 'nova-canvas'];
-          const availableEditModel = editFallbacks.find(name => rawModelData[name]?.input_modalities?.includes('image'));
-          
-          if (availableEditModel) {
-            editModel = availableEditModel;
-            console.warn(`⚠️ "${selectedModel}" only accepts text input — auto-switching to "${editModel}" for image editing`);
-            toast.info(`"${selectedModel}" can't edit images (text-only). Using "${editModel}" instead.`, { duration: 5000 });
-          } else {
-            toast.error('No image-editing models available. Please select a model that supports image input.');
-            return;
-          }
+          toast.error(`The selected model "${selectedModel}" does not support image editing. Please select a different model.`);
+          setIsGenerating(false);
+          return;
         }
-        
-        console.log('🔧 Using edit model:', editModel);
-        
+
         imageUrl = await pollinationsAPI.editImage({
-          model: editModel,  // ← Only models with input_modalities: ['text', 'image']
+          model: selectedModel,
           prompt: fullPrompt,
           image: referenceImages.join('|'),
           seed: actualSeed,
@@ -1322,7 +1326,7 @@ export default function SpatialImageEditor() {
           <label className="text-sm font-semibold text-zinc-700">
             Model
             {referenceImages.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-amber-600">✏️ Edit mode — models marked with ✏️ support image editing</span>
+              <span className="ml-2 text-xs font-normal text-amber-600">✏️ Filtered for image editing</span>
             )}
           </label>
           <div className="relative">
@@ -1331,15 +1335,13 @@ export default function SpatialImageEditor() {
               onChange={(e) => setSelectedModel(e.target.value)}
               className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
             >
-              {models.map(m => {
-                const canEdit = rawModelData[m.value]?.input_modalities?.includes('image');
-                return (
+              {models
+                .filter(m => referenceImages.length === 0 || rawModelData[m.value]?.input_modalities?.includes('image'))
+                .map(m => (
                   <option key={m.value} value={m.value}>
-                    {referenceImages.length > 0 && canEdit ? '✏️ ' : ''}{m.label}
-                    {referenceImages.length > 0 && !canEdit ? ' (text-to-image only)' : ''}
+                    {referenceImages.length > 0 ? '✏️ ' : ''}{m.label}
                   </option>
-                );
-              })}
+                ))}
             </select>
             <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
           </div>
