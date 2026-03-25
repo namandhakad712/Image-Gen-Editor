@@ -71,13 +71,21 @@ function filterModelsByEndpoint(models: any[], endpoint: string): any[] {
   );
 }
 
-// Filter image models (models that support BOTH generation AND edits endpoints)
+// Filter image models
+// The API at image.pollinations.ai/models returns models with `name` (not `id`)
+// and `output_modalities` but may not have `supported_endpoints`.
+// We filter by output_modalities containing 'image'.
 function getImageModels(models: any[]): any[] {
-  return models.filter(m => 
-    (m.supported_endpoints?.includes('/image/{prompt}') || 
-     m.supported_endpoints?.includes('/v1/images/generations')) &&
-    m.output_modalities?.includes('image')
-  );
+  return models.filter(m => {
+    // Primary filter: output must include 'image'
+    const outputsImage = m.output_modalities?.includes('image');
+    // If supported_endpoints exists, also check it includes an image endpoint
+    const hasImageEndpoint = !m.supported_endpoints || 
+      m.supported_endpoints.some((ep: string) => 
+        ep.includes('image') || ep.includes('/v1/images')
+      );
+    return outputsImage && hasImageEndpoint;
+  });
 }
 
 // Filter video models (models that output video)
@@ -236,17 +244,24 @@ export default function SpatialImageEditor() {
       .then(res => res.json())
       .then((data: any[]) => {
         console.log('📦 All models from API:', data.length);
-        console.log('Sample model structure:', data[0]);
+        if (data[0]) {
+          console.log('Sample model structure:', JSON.stringify(Object.keys(data[0])));
+          console.log('Sample model:', data[0].name || data[0].id, 'output_modalities:', data[0].output_modalities);
+        }
         
-        // Filter for image models only based on supported_endpoints and output_modalities
+        // Filter for image models only
         const imageModels = getImageModels(data);
         console.log('✅ Filtered image models:', imageModels.length);
-        console.log('Image model IDs:', imageModels.map(m => m.id || m.name));
+        console.log('Image model names:', imageModels.map((m: any) => m.name || m.id));
         
         if (imageModels.length > 0) {
-          setModels(imageModels.map(m => ({ value: m.name || m.id, label: m.description || m.name || m.id })));
+          // API uses `name` as the identifier, not `id`
+          setModels(imageModels.map((m: any) => ({
+            value: m.name || m.id,
+            label: m.description || m.name || m.id,
+          })));
         } else {
-          console.warn('No image models found, using defaults');
+          console.warn('No image models found from API, using defaults');
         }
       }).catch(err => console.error('Failed to fetch models:', err));
   }, []);

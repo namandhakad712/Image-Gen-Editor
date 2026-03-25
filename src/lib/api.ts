@@ -188,27 +188,41 @@ export class PollinationsAPI {
       const data = await response.json();
       console.log('✅ Edit response:', data);
       
-      // Get the image URL from response
-      const imageUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json;
-      
-      if (imageUrl) {
-        // If it's a blob URL, return it directly
-        if (imageUrl.startsWith('blob:')) {
-          return imageUrl;
+      const responseItem = data.data?.[0];
+      if (!responseItem) {
+        throw new Error('No image in response');
+      }
+
+      // Case 1: Response has a URL field — fetch and return as blob
+      if (responseItem.url) {
+        const url = responseItem.url;
+        if (url.startsWith('blob:') || url.startsWith('data:')) {
+          return url;
         }
-        // If it's b64_json, create blob URL
-        if (imageUrl.startsWith('data:')) {
-          return imageUrl;
-        }
-        // If it's a URL, fetch and convert to blob
-        const imgResponse = await fetch(imageUrl);
+        const imgResponse = await fetch(url);
         const blob = await imgResponse.blob();
         const blobUrl = URL.createObjectURL(blob);
-        console.log('✅ Edit complete, blob URL:', blobUrl);
+        console.log('✅ Edit complete (url), blob URL:', blobUrl);
         return blobUrl;
       }
-      
-      throw new Error('No image in response');
+
+      // Case 2: Response has b64_json — raw base64 string (NOT a data: URI)
+      // Convert to blob URL so it can be displayed as <img src>
+      if (responseItem.b64_json) {
+        const b64 = responseItem.b64_json;
+        // Decode base64 → binary → Blob → object URL
+        const byteChars = atob(b64);
+        const byteNumbers = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteNumbers[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: 'image/jpeg' });
+        const blobUrl = URL.createObjectURL(blob);
+        console.log('✅ Edit complete (b64_json), blob URL:', blobUrl);
+        return blobUrl;
+      }
+
+      throw new Error('No image URL or b64_json in response');
     } catch (error) {
       console.error('Image edit error:', error);
       throw error;
