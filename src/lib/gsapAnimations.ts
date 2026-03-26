@@ -284,7 +284,7 @@ export function animateToastOut(element: HTMLElement, onComplete?: () => void) {
 /**
  * Animate selection highlight
  */
-export function animateSelection(element: HTMLElement, color: string = '#EF8354') {
+export function animateSelection(element: HTMLElement, color: string = 'var(--accent-color)') {
     return gsap.fromTo(element,
         { boxShadow: `0 0 0 0 ${color}` },
         {

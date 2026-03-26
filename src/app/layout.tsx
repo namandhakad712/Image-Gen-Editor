@@ -96,7 +96,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#EF8354',
+  themeColor: 'var(--accent-color)',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
@@ -107,7 +107,7 @@ export const viewport: Viewport = {
 /**
  * Root Layout
  * Note: Theme colors are applied dynamically via ThemeProvider and CSS variables
- * The hardcoded #EF8354 in selection classes will be overridden by CSS var(--accent-color)
+ * The hardcoded var(--accent-color) in selection classes will be overridden by CSS var(--accent-color)
  */
 export default function RootLayout({
   children,
@@ -154,3 +154,4 @@ export default function RootLayout({
     </html>
   );
 }
+

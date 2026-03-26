@@ -55,9 +55,9 @@ export function NavigationMenu({ currentPath = '/', showGallery = false }: Navig
     const [accentColor] = useState(() => {
         if (typeof window !== 'undefined') {
             const computedStyle = getComputedStyle(document.documentElement);
-            return computedStyle.getPropertyValue('--accent-color').trim() || '#EF8354';
+            return computedStyle.getPropertyValue('--accent-color').trim() || 'var(--accent-color)';
         }
-        return '#EF8354';
+        return 'var(--accent-color)';
     });
 
     return (
@@ -66,7 +66,7 @@ export function NavigationMenu({ currentPath = '/', showGallery = false }: Navig
                 <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative" ref={menuRef}>
                     <button
                         onClick={() => setMenuOpen(!menuOpen)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
                     >
                         <LayoutGrid size={16} />
                         <span className="hidden sm:inline">Menu</span>
@@ -87,7 +87,7 @@ export function NavigationMenu({ currentPath = '/', showGallery = false }: Navig
                                     href={item.href}
                                     onClick={() => setMenuOpen(false)}
                                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive(item.href)
-                                            ? 'text-[#EF8354] bg-[#EF8354]/5'
+                                            ? 'text-[var(--accent-color)] bg-[var(--accent-color)]/5'
                                             : 'text-zinc-700 hover:bg-black/5'
                                         }`}
                                 >
@@ -139,7 +139,7 @@ export function CompactNavigation({ currentPath = '/' }: { currentPath?: string 
                 <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
                     <button
                         onClick={() => setMenuOpen(!menuOpen)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
                     >
                         <LayoutGrid size={16} />
                         <span className="hidden sm:inline">Gallery</span>
@@ -160,7 +160,7 @@ export function CompactNavigation({ currentPath = '/' }: { currentPath?: string 
                                     href={item.href}
                                     onClick={() => setMenuOpen(false)}
                                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive(item.href)
-                                            ? 'text-[#EF8354] bg-[#EF8354]/5'
+                                            ? 'text-[var(--accent-color)] bg-[var(--accent-color)]/5'
                                             : 'text-zinc-700 hover:bg-black/5'
                                         }`}
                                 >
@@ -178,3 +178,4 @@ export function CompactNavigation({ currentPath = '/' }: { currentPath?: string 
 }
 
 export default NavigationMenu;
+

@@ -175,32 +175,32 @@ export default function VideoPage() {
   };
 
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto">
+    <div className="w-full h-[100dvh] relative selection:bg-[var(--accent-color)] selection:text-white overflow-auto">
 
       {/* Top-left nav pill */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70] flex items-center gap-2">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
             <span className="hidden sm:inline">Gallery</span>
           </button>
           <div className="w-px h-4 bg-zinc-200 mx-2"></div>
-          <button className="p-1.5 rounded-full bg-[#EF8354]/10 text-[#EF8354] transition-colors">
+          <button className="p-1.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] transition-colors">
             <Video size={16} />
           </button>
 
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[80]">
               <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <History size={16} /> My Generations
               </a>
-              <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+              <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/5 transition-colors">
                 <Video size={16} /> Video Generation
               </a>
               <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
@@ -217,7 +217,7 @@ export default function VideoPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
             <Film size={24} />
           </div>
           <div>
@@ -258,7 +258,7 @@ export default function VideoPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleDownload}
-                className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] transition-all flex items-center justify-center gap-2"
               >
                 <Download size={16} /> Download Video
               </button>
@@ -282,7 +282,7 @@ export default function VideoPage() {
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder="Describe the video you want to create..."
-              className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl px-4 py-3 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+              className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl px-4 py-3 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 resize-none"
               rows={4}
             />
           </div>
@@ -304,7 +304,7 @@ export default function VideoPage() {
                 </button>
               </div>
             ) : (
-              <label className="block w-full aspect-video rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all">
+              <label className="block w-full aspect-video rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent-color)]/50 hover:bg-white/60 transition-all">
                 <input type="file" onChange={handleFileUpload} accept="image/*" className="hidden" />
                 <ImageIcon size={32} className="text-zinc-300 mb-2" />
                 <span className="text-sm font-semibold text-zinc-500">Upload reference image</span>
@@ -320,7 +320,7 @@ export default function VideoPage() {
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 pr-10 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+                className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 pr-10 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 cursor-pointer"
               >
                 {models.map(m => <option key={m.value} value={m.value}>{rawModelData[m.value]?.paid_only ? '🔒 ' : ''}{m.label}</option>)}
               </select>
@@ -341,7 +341,7 @@ export default function VideoPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-semibold text-zinc-700">Duration</label>
-                <span className="text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 px-2 py-0.5 rounded-md">{duration}s</span>
+                <span className="text-xs font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-2 py-0.5 rounded-md">{duration}s</span>
               </div>
               <input
                 type="range"
@@ -366,7 +366,7 @@ export default function VideoPage() {
                     key={ratio.id}
                     onClick={() => setAspectRatio(ratio.value)}
                     className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${aspectRatio === ratio.value
-                      ? 'bg-[#EF8354] text-white shadow-md'
+                      ? 'bg-[var(--accent-color)] text-white shadow-md'
                       : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                       }`}
                   >
@@ -380,7 +380,7 @@ export default function VideoPage() {
           {/* Audio Toggle */}
           <div className="flex items-center justify-between p-4 bg-zinc-50 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${audio ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'bg-zinc-200 text-zinc-400'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${audio ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'bg-zinc-200 text-zinc-400'}`}>
                 <Music size={18} />
               </div>
               <div>
@@ -420,7 +420,7 @@ export default function VideoPage() {
             disabled={isGenerating || !hasApiKey}
             className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${isGenerating || !hasApiKey
               ? 'bg-zinc-400 cursor-not-allowed shadow-none'
-              : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl text-white'
+              : 'bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] shadow-[var(--accent-color)]/25 hover:shadow-xl text-white'
               }`}
           >
             {isGenerating ? (
@@ -448,3 +448,4 @@ export default function VideoPage() {
     </div>
   );
 }
+

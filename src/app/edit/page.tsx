@@ -138,14 +138,14 @@ export default function EditPage() {
   };
 
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto">
+    <div className="w-full h-[100dvh] relative selection:bg-[var(--accent-color)] selection:text-white overflow-auto">
 
       {/* Top-left nav pill */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70] flex items-center gap-2">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
             <span className="hidden sm:inline">Gallery</span>
@@ -156,14 +156,14 @@ export default function EditPage() {
           </button>
 
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[80]">
               <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <History size={16} /> My Generations
               </a>
-              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+              <a href="/edit" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/5 transition-colors">
                 <ImagePlus size={16} /> Image Editor
               </a>
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
@@ -186,7 +186,7 @@ export default function EditPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+          <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
             <ImagePlus size={20} />
           </div>
           <div>
@@ -213,11 +213,11 @@ export default function EditPage() {
               </div>
             ) : (
               <div
-                className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all group"
+                className="aspect-square rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent-color)]/50 hover:bg-white/60 transition-all group"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <input type="file" ref={fileInputRef} onChange={handleUpload} accept="image/*" className="hidden" />
-                <div className="w-14 h-14 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] mb-3 group-hover:scale-110 transition-transform">
+                <div className="w-14 h-14 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)] mb-3 group-hover:scale-110 transition-transform">
                   <Upload size={24} />
                 </div>
                 <span className="text-sm font-semibold text-zinc-700">Upload image</span>
@@ -231,7 +231,7 @@ export default function EditPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-zinc-800">Result</h3>
               {resultImage && (
-                <button onClick={handleDownload} className="text-[11px] font-bold text-[#EF8354] hover:text-[#e27344] uppercase tracking-wider flex items-center gap-1">
+                <button onClick={handleDownload} className="text-[11px] font-bold text-[var(--accent-color)] hover:text-[var(--accent-color-dark)] uppercase tracking-wider flex items-center gap-1">
                   <Download size={12} /> Download
                 </button>
               )}
@@ -254,7 +254,7 @@ export default function EditPage() {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <textarea
-                className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl p-3 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none h-20"
+                className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl p-3 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 resize-none h-20"
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
                 placeholder="Describe what to change..."
@@ -266,7 +266,7 @@ export default function EditPage() {
                 <select
                   value={selectedModel}
                   onChange={e => setSelectedModel(e.target.value)}
-                  className="w-full md:w-48 appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-2.5 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+                  className="w-full md:w-48 appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-2.5 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 cursor-pointer"
                 >
                   {models.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                 </select>
@@ -276,7 +276,7 @@ export default function EditPage() {
                 onClick={handleEdit}
                 disabled={isProcessing || !sourceImage}
                 className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all
-                  ${isProcessing || !sourceImage ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed' : 'bg-[#EF8354] text-white hover:bg-[#e27344] shadow-lg shadow-[#EF8354]/20 active:scale-95'}`}
+                  ${isProcessing || !sourceImage ? 'bg-zinc-300 text-zinc-500 cursor-not-allowed' : 'bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color-dark)] shadow-lg shadow-[var(--accent-color)]/20 active:scale-95'}`}
               >
                 {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Processing...</> : <><Wand2 size={16} /> Apply Edit</>}
               </button>
@@ -288,3 +288,4 @@ export default function EditPage() {
     </div>
   );
 }
+

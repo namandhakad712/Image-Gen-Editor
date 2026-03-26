@@ -4,5 +4,7 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "outputDirectory": ".next",
-  "regions": ["iad1"]
+  "regions": [
+    "bom1"
+  ]
 }

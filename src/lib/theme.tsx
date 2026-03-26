@@ -8,7 +8,7 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  accentColor: '#EF8354',
+  accentColor: 'var(--accent-color)',
   setAccentColor: () => {},
 });
 
@@ -16,7 +16,7 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Predefined color palette for quick selection (optional)
 export const COLOR_PALETTE = [
-  { name: 'Sunset Orange', value: '#EF8354' },
+  { name: 'Sunset Orange', value: 'var(--accent-color)' },
   { name: 'Ocean Blue', value: '#3B82F6' },
   { name: 'Royal Purple', value: '#8B5CF6' },
   { name: 'Emerald Green', value: '#10B981' },
@@ -31,7 +31,7 @@ export const COLOR_PALETTE = [
 ];
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [accentColor, setAccentColorState] = useState('#EF8354');
+  const [accentColor, setAccentColorState] = useState('var(--accent-color)');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -75,3 +75,4 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     </ThemeContext.Provider>
   );
 }
+

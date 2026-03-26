@@ -93,37 +93,37 @@ export default function GalleryPage() {
   );
 
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto">
+    <div className="w-full h-[100dvh] relative selection:bg-[var(--accent-color)] selection:text-white overflow-auto">
 
       {/* Top Navigation */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70]">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-lg backdrop-blur-xl bg-white/80">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all font-semibold text-sm ${menuOpen ? 'bg-[#EF8354] text-white' : 'text-zinc-700 hover:bg-zinc-100'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all font-semibold text-sm ${menuOpen ? 'bg-[var(--accent-color)] text-white' : 'text-zinc-700 hover:bg-zinc-100'}`}
           >
             <LayoutGrid size={16} />
             Menu
           </button>
 
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-64 glass-panel rounded-2xl p-2 shadow-2xl backdrop-blur-xl bg-white/90 z-[60]">
-              <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
-                <Wand2 size={16} className="text-[#EF8354]" /> Image Generation
+            <div className="absolute top-full left-0 mt-2 w-64 glass-panel rounded-2xl p-2 shadow-2xl backdrop-blur-xl bg-white/90 z-[80]">
+              <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
+                <Wand2 size={16} className="text-[var(--accent-color)]" /> Image Generation
               </a>
-              <a href="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <History size={16} /> My Generations
               </a>
-              <a href="/video" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/video" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <Video size={16} /> Video Generation
               </a>
-              <a href="/usage" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/usage" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <BarChart3 size={16} /> Usage Dashboard
               </a>
-              <a href="/gallery" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/10 transition-all">
+              <a href="/gallery" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 transition-all">
                 <Images size={16} /> Community Gallery
               </a>
-              <a href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <Settings size={16} /> Settings
               </a>
             </div>
@@ -144,7 +144,7 @@ export default function GalleryPage() {
           <button
             onClick={fetchGallery}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm bg-[#EF8354] text-white hover:bg-[#e27344] transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm bg-[var(--accent-color)] text-white hover:bg-[var(--accent-color-dark)] transition-all disabled:opacity-50"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Refresh
@@ -159,7 +159,7 @@ export default function GalleryPage() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search prompts..."
-            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20"
           />
         </div>
 
@@ -253,7 +253,7 @@ export default function GalleryPage() {
                   </div>
                   <button
                     onClick={() => copyPrompt(selectedImage.prompt)}
-                    className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#EF8354] hover:underline"
+                    className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-color)] hover:underline"
                   >
                     {copiedPrompt ? <Check size={12} /> : <Copy size={12} />}
                     {copiedPrompt ? 'Copied!' : 'Copy Prompt'}
@@ -282,7 +282,7 @@ export default function GalleryPage() {
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => downloadImage(selectedImage.url, selectedImage.id)}
-                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-3 rounded-xl font-semibold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] transition-all flex items-center justify-center gap-2"
                   >
                     <Download size={16} />
                     Download
@@ -305,3 +305,4 @@ export default function GalleryPage() {
     </div>
   );
 }
+

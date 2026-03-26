@@ -78,14 +78,14 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-hidden">
+    <div className="w-full h-[100dvh] relative selection:bg-[var(--accent-color)] selection:text-white overflow-hidden">
 
       {/* Top-left nav pill */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70] flex items-center gap-2">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
             <span className="hidden sm:inline">Gallery</span>
@@ -96,11 +96,11 @@ export default function HistoryPage() {
           </button>
 
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[80]">
               <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Wand2 size={16} /> Image Generation
               </a>
-              <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+              <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/5 transition-colors">
                 <HistoryIcon size={16} /> My Generations
               </a>
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
@@ -127,7 +127,7 @@ export default function HistoryPage() {
             {/* Header */}
             <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+                <div className="w-9 h-9 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
                   <HistoryIcon size={18} />
                 </div>
                 <div>
@@ -143,12 +143,12 @@ export default function HistoryPage() {
             </div>
 
             {/* Warning Banner */}
-            <div className="bg-[#EF8354]/10 border border-[#EF8354]/20 rounded-xl p-3 flex items-start gap-3 shrink-0">
-              <Clock size={16} className="text-[#EF8354] shrink-0 mt-0.5" />
+            <div className="bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/20 rounded-xl p-3 flex items-start gap-3 shrink-0">
+              <Clock size={16} className="text-[var(--accent-color)] shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-medium text-zinc-700 leading-relaxed">
                   Images are stored locally in your browser cache and will be lost if you clear your data.
-                  <span className="font-bold text-[#EF8354] ml-1">Please download them to save safely.</span>
+                  <span className="font-bold text-[var(--accent-color)] ml-1">Please download them to save safely.</span>
                 </p>
               </div>
             </div>
@@ -161,7 +161,7 @@ export default function HistoryPage() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search by prompt or model..."
-                className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-2.5 pl-10 pr-4 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-2.5 pl-10 pr-4 text-sm text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20"
               />
             </div>
 
@@ -174,7 +174,7 @@ export default function HistoryPage() {
                   </div>
                   <p className="text-sm font-medium text-zinc-500">No images yet</p>
                   <p className="text-xs text-zinc-400 mt-1">Generated images will appear here</p>
-                  <a href="/" className="mt-4 px-4 py-2 rounded-xl bg-[#EF8354] text-white text-sm font-semibold hover:bg-[#e27344] transition-colors flex items-center gap-2">
+                  <a href="/" className="mt-4 px-4 py-2 rounded-xl bg-[var(--accent-color)] text-white text-sm font-semibold hover:bg-[var(--accent-color-dark)] transition-colors flex items-center gap-2">
                     <Wand2 size={14} /> Start Generating
                   </a>
                 </div>
@@ -184,7 +184,7 @@ export default function HistoryPage() {
                     <div
                       key={item.id}
                       className={`history-card aspect-square rounded-2xl overflow-hidden cursor-pointer group relative bg-zinc-100 transition-all
-                        ${selectedItem?.id === item.id ? 'ring-3 ring-[#EF8354] ring-offset-2' : 'hover:ring-2 hover:ring-[#EF8354]/40'}`}
+                        ${selectedItem?.id === item.id ? 'ring-3 ring-[var(--accent-color)] ring-offset-2' : 'hover:ring-2 hover:ring-[var(--accent-color)]/40'}`}
                       onClick={() => setSelectedItem(item)}
                     >
                       <img src={item.imageUrl} alt={item.prompt} className="w-full h-full object-cover" />
@@ -192,7 +192,7 @@ export default function HistoryPage() {
                         <div className="flex justify-end">
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDownload(item.imageUrl, item.id); }}
-                            className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#EF8354] hover:text-white transition-colors"
+                            className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[var(--accent-color)] hover:text-white transition-colors"
                             title="Download image"
                           >
                             <Download size={14} />
@@ -254,7 +254,7 @@ export default function HistoryPage() {
               <div className="flex gap-2 mt-auto shrink-0">
                 <button
                   onClick={() => handleDownload(selectedItem.imageUrl, selectedItem.id)}
-                  className="flex-1 py-2.5 rounded-xl bg-[#EF8354] text-white font-semibold text-sm hover:bg-[#e27344] transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 rounded-xl bg-[var(--accent-color)] text-white font-semibold text-sm hover:bg-[var(--accent-color-dark)] transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={14} /> Download
                 </button>
@@ -279,3 +279,4 @@ export default function HistoryPage() {
     </div>
   );
 }
+

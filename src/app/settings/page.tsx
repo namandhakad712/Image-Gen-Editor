@@ -164,34 +164,34 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
+    <div className="w-full h-[100dvh] relative selection:bg-[var(--accent-color)] selection:text-white overflow-auto bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
 
       {/* Top Navigation */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70]">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-lg backdrop-blur-xl bg-white/80">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all font-semibold text-sm ${menuOpen ? 'bg-[#EF8354] text-white' : 'text-zinc-700 hover:bg-zinc-100'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all font-semibold text-sm ${menuOpen ? 'bg-[var(--accent-color)] text-white' : 'text-zinc-700 hover:bg-zinc-100'}`}
           >
             <LayoutGrid size={16} />
             Menu
           </button>
 
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-64 glass-panel rounded-2xl p-2 shadow-2xl backdrop-blur-xl bg-white/90 z-[60]">
-              <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
-                <Wand2 size={16} className="text-[#EF8354]" /> Image Generation
+            <div className="absolute top-full left-0 mt-2 w-64 glass-panel rounded-2xl p-2 shadow-2xl backdrop-blur-xl bg-white/90 z-[80]">
+              <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
+                <Wand2 size={16} className="text-[var(--accent-color)]" /> Image Generation
               </a>
-              <a href="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <History size={16} /> My Generations
               </a>
-              <a href="/video" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/video" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <Video size={16} /> Video Generation
               </a>
-              <a href="/usage" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[#EF8354]/10 transition-all">
+              <a href="/usage" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-zinc-700 hover:bg-[var(--accent-color)]/10 transition-all">
                 <BarChart3 size={16} /> Usage Dashboard
               </a>
-              <a href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/10 transition-all">
+              <a href="/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 transition-all">
                 <SettingsIcon size={16} /> Settings
               </a>
             </div>
@@ -221,7 +221,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={handleBYOPAuth}
-              className="px-6 py-3 rounded-xl font-bold text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg hover:shadow-xl"
+              className="px-6 py-3 rounded-xl font-bold text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] transition-all shadow-lg hover:shadow-xl"
             >
               Connect Now
             </button>
@@ -243,7 +243,7 @@ export default function SettingsPage() {
                     <h2 className="text-xl font-bold text-zinc-800">{profile.name || 'Anonymous'}</h2>
                     <p className="text-sm text-zinc-500">{profile.email}</p>
                     <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-xs font-semibold">
-                      <Zap size={12} className="text-[#EF8354]" />
+                      <Zap size={12} className="text-[var(--accent-color)]" />
                       {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)} Tier
                     </div>
                   </div>
@@ -284,9 +284,9 @@ export default function SettingsPage() {
                   <p className="text-2xl font-bold text-green-600">{stats.thisWeek}</p>
                   <p className="text-[10px] font-semibold text-green-400 uppercase mt-1">This Week</p>
                 </div>
-                <div className="text-center p-4 rounded-2xl bg-gradient-to-br from-[#EF8354]/10 to-[#EF8354]/20">
-                  <p className="text-2xl font-bold text-[#EF8354]">{balance !== null ? balance.toFixed(3) : '--'}</p>
-                  <p className="text-[10px] font-semibold text-[#EF8354]/70 uppercase mt-1">Pollen Left</p>
+                <div className="text-center p-4 rounded-2xl bg-gradient-to-br from-[var(--accent-color)]/10 to-[var(--accent-color)]/20">
+                  <p className="text-2xl font-bold text-[var(--accent-color)]">{balance !== null ? balance.toFixed(3) : '--'}</p>
+                  <p className="text-[10px] font-semibold text-[var(--accent-color)]/70 uppercase mt-1">Pollen Left</p>
                 </div>
               </div>
             </div>
@@ -338,11 +338,11 @@ export default function SettingsPage() {
                   value={apiKey}
                   onChange={e => setApiKey(e.target.value)}
                   placeholder="sk_..."
-                  className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                  className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20"
                 />
                 <button
                   onClick={handleSaveKey}
-                  className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg"
+                  className="w-full py-3 rounded-xl font-bold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] transition-all shadow-lg"
                 >
                   Save Key
                 </button>
@@ -353,7 +353,7 @@ export default function SettingsPage() {
           {/* Quick Actions */}
           <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#EF8354] to-orange-500 flex items-center justify-center text-white shadow-lg">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-orange-500 flex items-center justify-center text-white shadow-lg">
                 <Sparkles size={18} />
               </div>
               <div>
@@ -364,14 +364,14 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <a href="/usage" className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <BarChart3 size={16} className="text-zinc-400 group-hover:text-[#EF8354]" />
+                  <BarChart3 size={16} className="text-zinc-400 group-hover:text-[var(--accent-color)]" />
                   <span className="text-sm font-medium text-zinc-700">Usage Stats</span>
                 </div>
                 <ChevronRight size={14} className="text-zinc-300" />
               </a>
               <a href="/history" className="flex items-center justify-between p-3 rounded-xl hover:bg-zinc-50 transition-all group">
                 <div className="flex items-center gap-3">
-                  <Images size={16} className="text-zinc-400 group-hover:text-[#EF8354]" />
+                  <Images size={16} className="text-zinc-400 group-hover:text-[var(--accent-color)]" />
                   <span className="text-sm font-medium text-zinc-700">My Gallery</span>
                 </div>
                 <ChevronRight size={14} className="text-zinc-300" />
@@ -382,7 +382,7 @@ export default function SettingsPage() {
                 className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-zinc-50 transition-all group"
               >
                 <div className="flex items-center gap-3">
-                  <RefreshCw size={16} className={`text-zinc-400 group-hover:text-[#EF8354] ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw size={16} className={`text-zinc-400 group-hover:text-[var(--accent-color)] ${loading ? 'animate-spin' : ''}`} />
                   <span className="text-sm font-medium text-zinc-700">Refresh Data</span>
                 </div>
                 <ChevronRight size={14} className="text-zinc-300" />
@@ -391,10 +391,10 @@ export default function SettingsPage() {
           </div>
 
           {/* BYOP Connect */}
-          <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-[#EF8354]/10 to-orange-100/50 border border-[#EF8354]/20 shadow-xl">
+          <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-[var(--accent-color)]/10 to-orange-100/50 border border-[var(--accent-color)]/20 shadow-xl">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center text-[#EF8354] shadow-lg">
+                <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center text-[var(--accent-color)] shadow-lg">
                   <LogIn size={24} />
                 </div>
                 <div>
@@ -404,7 +404,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={handleBYOPAuth}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] transition-all shadow-lg flex items-center gap-2"
               >
                 <ExternalLink size={14} />
                 Connect
@@ -420,68 +420,74 @@ export default function SettingsPage() {
 
           {/* Theme Color Picker */}
           <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-lg">
                   <Palette size={18} />
                 </div>
                 <div>
                   <h3 className="font-bold text-zinc-800">Theme Color</h3>
-                  <p className="text-xs text-zinc-400">Pick any color you love</p>
+                  <p className="text-xs text-zinc-400">Personalize your accent color</p>
                 </div>
               </div>
             </div>
 
-            {/* Current Color Preview & Color Picker */}
-            <div className="flex items-center gap-4 mb-4 p-4 rounded-2xl bg-zinc-50/80 border border-zinc-200">
-              <div
-                className="w-16 h-16 rounded-xl shadow-lg border-2 border-white"
-                style={{ backgroundColor: accentColor }}
-              />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-zinc-800 mb-2">Choose Your Accent Color</p>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={accentColor}
-                    onChange={(e) => {
-                      setAccentColor(e.target.value);
-                      toast.success(`Theme color updated`);
-                    }}
-                    className="w-12 h-12 rounded-lg cursor-pointer border-2 border-zinc-200 bg-white p-1 hover:border-[#EF8354] transition-colors"
-                  />
-                  <div className="flex-1">
-                    <p className="text-xs text-zinc-500 font-mono">{accentColor}</p>
-                    <p className="text-[10px] text-zinc-400">Click to pick any color</p>
+            {/* Modern Color Picker */}
+            <div className="flex flex-col md:flex-row gap-6 items-start">
+              {/* Color Preview Circle */}
+              <div className="flex-shrink-0">
+                <div
+                  className="w-24 h-24 rounded-full shadow-2xl border-4 border-white transition-all duration-300"
+                  style={{ backgroundColor: accentColor, boxShadow: `0 0 40px ${accentColor}40` }}
+                />
+              </div>
+
+              {/* Controls */}
+              <div className="flex-1 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Custom Color</label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(e) => {
+                          setAccentColor(e.target.value);
+                          toast.success(`Theme color updated to ${e.target.value}`);
+                        }}
+                        className="w-16 h-16 rounded-2xl cursor-pointer border-2 border-zinc-200 bg-white p-1 hover:scale-105 transition-transform"
+                      />
+                      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-zinc-400 whitespace-nowrap">Click to change</div>
+                    </div>
+                    <div className="flex-1 bg-zinc-100 rounded-xl px-4 py-3 border border-zinc-200">
+                      <p className="text-sm font-mono text-zinc-600">{accentColor}</p>
+                    </div>
                   </div>
-                  <CheckCircle2 size={20} className="text-green-500" />
+                </div>
+
+                {/* Preset Grid - Only 4 popular colors */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Popular Choices</label>
+                  <div className="flex gap-2">
+                    {['#EF8354', '#3B82F6', '#8B5CF6', '#10B981'].map(color => (
+                      <button
+                        key={color}
+                        onClick={() => { setAccentColor(color); toast.success(`Theme color updated`); }}
+                        className={`w-10 h-10 rounded-xl transition-all hover:scale-110 ${accentColor === color
+                          ? 'ring-2 ring-offset-2 ring-zinc-400 scale-105'
+                          : 'hover:shadow-md'
+                          }`}
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick Color Presets */}
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-zinc-600 mb-3">Quick Presets</p>
-              <div className="grid grid-cols-8 gap-2">
-                {COLOR_PALETTE.map(color => (
-                  <button
-                    key={color.value}
-                    onClick={() => { setAccentColor(color.value); toast.success(`Theme changed to ${color.name}`); }}
-                    className={`group relative w-full aspect-square rounded-lg transition-all hover:scale-110 ${accentColor === color.value ? 'ring-2 ring-offset-2 ring-zinc-400 scale-110' : ''
-                      }`}
-                    style={{ backgroundColor: color.value }}
-                    title={color.name}
-                  >
-                    {accentColor === color.value && (
-                      <CheckCircle2 size={14} className="absolute inset-0 m-auto text-white drop-shadow-lg" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <p className="text-[10px] text-zinc-400 text-center">
-              ✨ Your color is saved and applied across the entire app
+            <p className="text-[10px] text-zinc-400 text-center mt-4">
+              ✨ Your color is instantly applied across the entire app
             </p>
           </div>
 
@@ -497,7 +503,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-zinc-400">Your latest creations</p>
                 </div>
               </div>
-              <a href="/history" className="text-sm font-semibold text-[#EF8354] hover:underline flex items-center gap-1">
+              <a href="/history" className="text-sm font-semibold text-[var(--accent-color)] hover:underline flex items-center gap-1">
                 View All <ChevronRight size={14} />
               </a>
             </div>
@@ -578,3 +584,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

@@ -6,7 +6,7 @@
 
 /* Theme Colors - CSS Variables */
 :root {
-  --accent-color: #EF8354;
+  --accent-color: var(--accent-color);
   --accent-color-light: rgba(239, 131, 84, 0.2);
   --accent-color-border: rgba(239, 131, 84, 0.4);
 }
@@ -37,7 +37,7 @@ body {
 
 /* Hardcoded override for selection when CSS var is not loaded */
 .selection-bg-hardcoded {
-  background: #EF8354;
+  background: var(--accent-color);
 }
 
 /* ==============================
@@ -48,7 +48,7 @@ body {
   backdrop-filter: blur(60px) saturate(180%) brightness(105%);
   -webkit-backdrop-filter: blur(60px) saturate(180%) brightness(105%);
   border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 
+  box-shadow:
     0 32px 64px -16px rgba(0, 0, 0, 0.12),
     0 0 0 1px rgba(255, 255, 255, 0.5) inset,
     0 8px 32px rgba(0, 0, 0, 0.04);
@@ -59,7 +59,7 @@ body {
   backdrop-filter: blur(50px) saturate(160%) brightness(102%);
   -webkit-backdrop-filter: blur(50px) saturate(160%) brightness(102%);
   border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.08),
     0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
@@ -76,7 +76,7 @@ body {
   backdrop-filter: blur(80px) saturate(200%) brightness(103%);
   -webkit-backdrop-filter: blur(80px) saturate(200%) brightness(103%);
   border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 
+  box-shadow:
     0 40px 80px -20px rgba(0, 0, 0, 0.15),
     0 0 0 1px rgba(255, 255, 255, 0.4) inset;
 }
@@ -231,10 +231,23 @@ input[type=range]::-moz-range-track {
 }
 
 @keyframes scan {
-  0% { top: -10%; opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 110%; opacity: 0; }
+  0% {
+    top: -10%;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 110%;
+    opacity: 0;
+  }
 }
 
 /* ==============================
@@ -289,7 +302,7 @@ input[type=range]::-moz-range-track {
 
 /* Canvas dot pattern */
 .canvas-dots {
-  background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.06) 1px, transparent 1px);
   background-size: 30px 30px;
 }
 
@@ -301,8 +314,15 @@ input[type=range]::-moz-range-track {
    ANIMATIONS
    ============================== */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -310,8 +330,15 @@ input[type=range]::-moz-range-track {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-slide-up {
@@ -319,8 +346,15 @@ input[type=range]::-moz-range-track {
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-slide-down {
@@ -331,11 +365,12 @@ input[type=range]::-moz-range-track {
    MOBILE RESPONSIVENESS
    ============================== */
 @media (max-width: 768px) {
+
   /* Bottom panel adjustments */
   .glass-panel.rounded-t-\[32px\] {
     border-radius: 24px 24px 0 0 !important;
   }
-  
+
   /* Sidebar adjustments */
   aside {
     width: 100% !important;
@@ -345,26 +380,26 @@ input[type=range]::-moz-range-track {
     margin: 0 16px !important;
     bottom: 100px !important;
   }
-  
+
   /* Canvas images - better touch targets */
   .canvas-transform img {
     touch-action: none;
   }
-  
+
   /* Larger touch targets for buttons */
   button {
     min-height: 44px;
   }
-  
+
   /* Adjust font sizes for mobile */
   h1 {
     font-size: 1.5rem !important;
   }
-  
+
   h2 {
     font-size: 1.25rem !important;
   }
-  
+
   /* Full-width modals on mobile */
   .glass-panel.max-w-2xl,
   .glass-panel.max-w-md,
@@ -372,9 +407,10 @@ input[type=range]::-moz-range-track {
     max-width: calc(100vw - 32px) !important;
     margin: 0 16px !important;
   }
-  
+
   /* Bottom sheet style for modals */
   @media (max-height: 600px) {
+
     .glass-panel.rounded-t-3xl,
     .glass-panel.rounded-t-\[32px\] {
       max-height: 85vh !important;
@@ -387,11 +423,11 @@ input[type=range]::-moz-range-track {
   .glass-pill {
     padding: 8px !important;
   }
-  
+
   button span {
     display: none;
   }
-  
+
   button svg {
     margin: 0 auto;
   }
@@ -403,13 +439,99 @@ input[type=range]::-moz-range-track {
     top: 60px !important;
     bottom: 80px !important;
   }
-  
+
   .bottom-panel {
     padding: 8px !important;
   }
-  
+
   textarea {
     height: 40px !important;
     min-height: 40px !important;
+  }
+}
+
+/* ==============================
+   ENHANCED MOBILE RESPONSIVENESS
+   ============================== */
+
+/* Tablet styles */
+@media (min-width: 768px) and (max-width: 1024px) {
+  aside {
+    width: 320px !important;
+  }
+
+  .bottom-panel {
+    max-width: 90vw !important;
+  }
+}
+
+/* Large tablets and small laptops */
+@media (min-width: 1024px) and (max-width: 1280px) {
+  aside {
+    width: 360px !important;
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+  button {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+    /* Prevents iOS zoom on focus */
+  }
+
+  .glass-panel {
+    touch-action: manipulation;
+  }
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2),
+(min-resolution: 192dpi) {
+  .glass-panel {
+    backdrop-filter: blur(40px) saturate(180%);
+  }
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+  .fixed {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+
+  .bottom-0 {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .top-4,
+  .top-6 {
+    padding-top: max(16px, env(safe-area-inset-top));
+  }
+}
+
+/* Dark mode support (for future) */
+@media (prefers-color-scheme: dark) {
+  /* Dark mode styles can be added here */
+}
+
+/* Print styles */
+@media print {
+
+  .glass-panel,
+  .glass-pill {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+
+  .fixed {
+    position: relative !important;
   }
 }

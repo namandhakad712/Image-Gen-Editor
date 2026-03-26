@@ -35,6 +35,15 @@ const ASPECT_RATIOS = [
   { id: '9:16', label: '9:16', shapeClass: 'shape-9-16', cssRatio: '9/16', width: 720, height: 1280 },
 ];
 
+// Custom aspect ratio state - stored in component
+interface CustomAspectRatio {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+  unit: string;
+}
+
 const ALL_MODIFIERS = [
   { label: 'High Resolution', prompt: 'masterpiece, best quality, ultra-detailed, 8K resolution, photorealistic, sharp focus' },
   { label: 'Studio Lighting', prompt: 'professional studio lighting, softbox lighting, dramatic shadows, three-point lighting' },
@@ -112,7 +121,7 @@ export default function SpatialImageEditor() {
   const [activeModifiers, setActiveModifiers] = useState<string[]>([]);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState('flux');
-  const [penColor, setPenColor] = useState('#EF8354');
+  const [penColor, setPenColor] = useState('var(--accent-color)');
   const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -126,6 +135,13 @@ export default function SpatialImageEditor() {
   const [customStyleName, setCustomStyleName] = useState('');
   const [customStylePrompt, setCustomStylePrompt] = useState('');
   const [customStyles, setCustomStyles] = useState<ArtStyle[]>([]);
+
+  // Custom Aspect Ratio State
+  const [showCustomAspectModal, setShowCustomAspectModal] = useState(false);
+  const [customAspectWidth, setCustomAspectWidth] = useState('');
+  const [customAspectHeight, setCustomAspectHeight] = useState('');
+  const [customAspectUnit, setCustomAspectUnit] = useState('px');
+  const [customAspectRatios, setCustomAspectRatios] = useState<Array<{ id: string; label: string; width: number; height: number }>>([]);
 
   // Load custom styles from localStorage
   useEffect(() => {
@@ -150,6 +166,17 @@ export default function SpatialImageEditor() {
         }
       } catch (e) {
         console.error('Failed to load canvas images:', e);
+      }
+    }
+
+    // Load custom aspect ratios from localStorage
+    const savedAspectRatios = localStorage.getItem('pollinations_custom_aspect_ratios');
+    if (savedAspectRatios) {
+      try {
+        const parsed = JSON.parse(savedAspectRatios);
+        setCustomAspectRatios(parsed);
+      } catch (e) {
+        console.error('Failed to load custom aspect ratios:', e);
       }
     }
   }, []);
@@ -182,6 +209,78 @@ export default function SpatialImageEditor() {
     setCustomStyles(updated);
     localStorage.setItem('pollinations_custom_styles', JSON.stringify(updated));
     toast.success('Custom style deleted');
+  };
+
+  // Save custom aspect ratio
+  const handleSaveCustomAspectRatio = () => {
+    const width = parseFloat(customAspectWidth);
+    const height = parseFloat(customAspectHeight);
+
+    if (!width || !height || width <= 0 || height <= 0) {
+      toast.error('Please enter valid width and height values');
+      return;
+    }
+
+    // Convert to pixels based on unit
+    let pixelWidth = width;
+    let pixelHeight = height;
+
+    // Conversion rates to pixels (assuming 96 DPI as base)
+    const cmToInch = 2.54;
+    const inchToPx = 96;
+
+    switch (customAspectUnit) {
+      case 'cm':
+        pixelWidth = Math.round((width / cmToInch) * inchToPx);
+        pixelHeight = Math.round((height / cmToInch) * inchToPx);
+        break;
+      case 'in':
+        pixelWidth = Math.round(width * inchToPx);
+        pixelHeight = Math.round(height * inchToPx);
+        break;
+      case 'mm':
+        pixelWidth = Math.round((width / 10 / cmToInch) * inchToPx);
+        pixelHeight = Math.round((height / 10 / cmToInch) * inchToPx);
+        break;
+      default:
+        // Already in pixels
+        pixelWidth = Math.round(width);
+        pixelHeight = Math.round(height);
+    }
+
+    const newAspect: { id: string; label: string; width: number; height: number } = {
+      id: `custom-${Date.now()}`,
+      label: `${pixelWidth}×${pixelHeight}`,
+      width: pixelWidth,
+      height: pixelHeight,
+    };
+
+    const updated = [...customAspectRatios, newAspect];
+    setCustomAspectRatios(updated);
+    localStorage.setItem('pollinations_custom_aspect_ratios', JSON.stringify(updated));
+
+    // Also set as current aspect ratio
+    setAspectRatio({
+      id: newAspect.id,
+      label: newAspect.label,
+      shapeClass: 'shape-custom',
+      cssRatio: `${pixelWidth}/${pixelHeight}`,
+      width: pixelWidth,
+      height: pixelHeight,
+    });
+
+    setCustomAspectWidth('');
+    setCustomAspectHeight('');
+    setShowCustomAspectModal(false);
+    toast.success(`Custom aspect ratio ${newAspect.label} saved!`);
+  };
+
+  // Delete custom aspect ratio
+  const handleDeleteCustomAspectRatio = (ratioId: string) => {
+    const updated = customAspectRatios.filter(r => r.id !== ratioId);
+    setCustomAspectRatios(updated);
+    localStorage.setItem('pollinations_custom_aspect_ratios', JSON.stringify(updated));
+    toast.success('Custom aspect ratio deleted');
   };
 
   // Batch generation
@@ -1043,7 +1142,7 @@ export default function SpatialImageEditor() {
             <div
               key={img.id}
               className={`absolute group ${selectedImageId === img.id
-                ? 'ring-4 ring-offset-2 ring-offset-white/30 shadow-2xl ring-[#EF8354]'
+                ? 'ring-4 ring-offset-2 ring-offset-white/30 shadow-2xl ring-[var(--accent-color)]'
                 : 'hover:ring-2 hover:shadow-xl'
                 } ${activeTool === 'pointer' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
               style={{
@@ -1169,7 +1268,7 @@ export default function SpatialImageEditor() {
       {/* =========================================
           TOP-LEFT: MENU PILL
       ========================================= */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70] flex items-center gap-2">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-2 md:pr-4 shadow-sm relative">
           {/* Mobile sidebar toggle */}
           <button
@@ -1183,7 +1282,7 @@ export default function SpatialImageEditor() {
           {/* Gallery / Menu button */}
           <button
             onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
             <span className="hidden sm:inline">Create</span>
@@ -1198,8 +1297,8 @@ export default function SpatialImageEditor() {
 
           {/* Dropdown Menu */}
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
-              <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[80]">
+              <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/5 transition-colors">
                 <Wand2 size={16} /> Image Generation
               </a>
               <a href="/history" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
@@ -1217,7 +1316,7 @@ export default function SpatialImageEditor() {
               <div className="h-px bg-zinc-200/50 my-1.5"></div>
               <div className="px-3 py-2 flex items-center justify-between">
                 <span className="text-xs text-zinc-400">Zoom: {Math.round(zoom * 100)}%</span>
-                <button onClick={resetView} className="text-xs font-semibold text-[#EF8354] hover:underline">Reset View</button>
+                <button onClick={resetView} className="text-xs font-semibold text-[var(--accent-color)] hover:underline">Reset View</button>
               </div>
               <div className="px-3 py-2 flex items-center justify-between">
                 <button onClick={clearCanvas} className="text-xs font-semibold text-red-500 hover:underline flex items-center gap-1">
@@ -1236,9 +1335,9 @@ export default function SpatialImageEditor() {
       {!isSidebarOpen && (
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="fixed top-1/2 left-[308px] md:left-[348px] -translate-y-1/2 z-40 p-2.5 glass-panel rounded-full shadow-lg hover:scale-110 transition-all backdrop-blur-xl bg-white/80 group"
+          className="fixed top-1/2 left-[88vw] md:left-[348px] -translate-y-1/2 z-40 p-2.5 glass-panel rounded-full shadow-lg hover:scale-110 transition-all backdrop-blur-xl bg-white/80 group"
         >
-          <ChevronRight size={18} className="text-zinc-600 group-hover:text-[#EF8354] transition-colors" />
+          <ChevronRight size={18} className="text-zinc-600 group-hover:text-[var(--accent-color)] transition-colors" />
         </button>
       )}
 
@@ -1250,19 +1349,19 @@ export default function SpatialImageEditor() {
         <div className="glass-pill rounded-full flex flex-row md:flex-col items-center p-1.5 md:p-2 gap-1 md:gap-2">
           <button
             onClick={() => setActiveTool('pointer')}
-            className={`p-2 rounded-full transition-colors ${activeTool === 'pointer' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
+            className={`p-2 rounded-full transition-colors ${activeTool === 'pointer' ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
           >
             <MousePointer2 size={18} />
           </button>
           <button
             onClick={() => setActiveTool('hand')}
-            className={`p-2 rounded-full transition-colors ${activeTool === 'hand' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
+            className={`p-2 rounded-full transition-colors ${activeTool === 'hand' ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
           >
             <Hand size={18} />
           </button>
           <button
             onClick={() => setActiveTool('pen')}
-            className={`p-2 rounded-full transition-colors ${activeTool === 'pen' ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
+            className={`p-2 rounded-full transition-colors ${activeTool === 'pen' ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-500 hover:text-black hover:bg-black/5'}`}
           >
             <PenLine size={18} />
           </button>
@@ -1271,11 +1370,11 @@ export default function SpatialImageEditor() {
             <>
               <div className="w-px h-4 bg-zinc-200 mx-1"></div>
               <div className="flex items-center gap-1.5 px-2">
-                {['#EF8354', '#2D3142', '#4F5D75', '#BFC0C0', '#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].slice(0, 8).map(c => (
+                {['var(--accent-color)', '#2D3142', '#4F5D75', '#BFC0C0', '#FFFFFF', '#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'].slice(0, 8).map(c => (
                   <button
                     key={c}
                     onClick={() => setPenColor(c)}
-                    className={`w-4 h-4 rounded-full border border-zinc-200 transition-transform ${penColor === c ? 'scale-125 ring-2 ring-[#EF8354]/20' : 'hover:scale-110'}`}
+                    className={`w-4 h-4 rounded-full border border-zinc-200 transition-transform ${penColor === c ? 'scale-125 ring-2 ring-[var(--accent-color)]/20' : 'hover:scale-110'}`}
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -1293,7 +1392,7 @@ export default function SpatialImageEditor() {
         <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`sidebar-panel fixed top-20 bottom-56 md:top-24 md:bottom-40 left-4 md:left-6 w-[300px] md:w-[340px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
+      <aside className={`sidebar-panel fixed top-16 bottom-4 md:top-20 md:bottom-8 left-4 md:left-6 w-[85vw] md:w-[340px] max-w-[340px] glass-panel rounded-[28px] p-4 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:-translate-x-[120%]'}`}>
 
         {/* Close button for mobile */}
@@ -1310,7 +1409,7 @@ export default function SpatialImageEditor() {
             <div className="flex items-center gap-2">
               <label className="text-sm font-semibold text-zinc-700">Reference Image</label>
               {referenceImages.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#EF8354]/10 text-[#EF8354] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                   <Sparkles size={8} />
                   Edit Mode
                 </span>
@@ -1326,9 +1425,9 @@ export default function SpatialImageEditor() {
           </div>
 
           {referenceImages.length > 0 && (
-            <div className="p-3 rounded-xl bg-[#EF8354]/5 border border-[#EF8354]/20">
+            <div className="p-3 rounded-xl bg-[var(--accent-color)]/5 border border-[var(--accent-color)]/20">
               <p className="text-[10px] text-zinc-600 leading-relaxed">
-                <strong className="text-[#EF8354]">Image Edit Mode:</strong> The AI will edit your reference image based on your prompt. Uses /v1/images/edits endpoint.
+                <strong className="text-[var(--accent-color)]">Image Edit Mode:</strong> The AI will edit your reference image based on your prompt. Uses /v1/images/edits endpoint.
               </p>
             </div>
           )}
@@ -1349,14 +1448,14 @@ export default function SpatialImageEditor() {
           )}
           {referenceImages.length < 4 && (
             <div
-              className={`w-full ${referenceImages.length > 0 ? 'aspect-[4/1]' : 'aspect-[4/2.5]'} rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[#EF8354]/50 hover:bg-white/60 transition-all group relative overflow-hidden`}
+              className={`w-full ${referenceImages.length > 0 ? 'aspect-[4/1]' : 'aspect-[4/2.5]'} rounded-2xl border-2 border-dashed border-zinc-200 bg-white/40 flex flex-col items-center justify-center cursor-pointer hover:border-[var(--accent-color)]/50 hover:bg-white/60 transition-all group relative overflow-hidden`}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
             >
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" multiple className="hidden" />
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354] group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)] group-hover:scale-110 transition-transform">
                   <ImagePlus size={20} />
                 </div>
                 {!referenceImages.length ? (
@@ -1373,7 +1472,7 @@ export default function SpatialImageEditor() {
 
           <button
             onClick={(e) => { e.stopPropagation(); handleAddUrl(); }}
-            className={`w-full text-xs font-semibold py-2.5 rounded-xl border border-zinc-200/50 bg-white/40 hover:bg-[#EF8354]/5 hover:text-[#EF8354] transition-all
+            className={`w-full text-xs font-semibold py-2.5 rounded-xl border border-zinc-200/50 bg-white/40 hover:bg-[var(--accent-color)]/5 hover:text-[var(--accent-color)] transition-all
                ${referenceImages.length >= 4 ? 'hidden' : 'block'}`}
           >
             Or paste image URL
@@ -1383,21 +1482,63 @@ export default function SpatialImageEditor() {
         {/* Aspect Ratio */}
         <section className="space-y-3 shrink-0">
           <label className="text-sm font-semibold text-zinc-700 flex justify-between">
-            Aspect Ratio <span className="text-[#EF8354] font-bold">{aspectRatio.label}</span>
+            Aspect Ratio <span className="text-[var(--accent-color)] font-bold">{aspectRatio.label}</span>
           </label>
-          <div className="bg-zinc-100/80 p-1.5 rounded-2xl flex items-center gap-1 border border-zinc-200/50 overflow-x-auto custom-scrollbar">
+          <div className="grid grid-cols-3 gap-2">
             {ASPECT_RATIOS.map(ratio => (
               <button
                 key={ratio.id}
                 onClick={() => setAspectRatio(ratio)}
-                className={`flex-1 min-w-[48px] flex flex-col justify-center items-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all shrink-0
-                  ${aspectRatio.id === ratio.id ? 'bg-white shadow-sm text-[#EF8354] border border-[#EF8354]/20' : 'text-zinc-500 hover:text-zinc-700 hover:bg-white/50'}`}
+                className={`flex flex-col items-center justify-center p-3 rounded-xl text-xs font-semibold transition-all
+                  ${aspectRatio.id === ratio.id ? 'bg-[var(--accent-color)] text-white shadow-lg' : 'bg-zinc-100/80 text-zinc-600 hover:bg-zinc-200/80 border border-zinc-200/50'}`}
               >
-                <div className={ratio.shapeClass}></div>
+                <div className={`${ratio.shapeClass} mb-2 ${aspectRatio.id === ratio.id ? 'bg-white/30' : 'bg-zinc-400'}`}></div>
                 <span>{ratio.label}</span>
               </button>
             ))}
           </div>
+
+          {/* Custom Aspect Ratios */}
+          {customAspectRatios.length > 0 && (
+            <div className="mt-3">
+              <span className="text-xs font-medium text-zinc-500 mb-2 block">Custom</span>
+              <div className="grid grid-cols-2 gap-2">
+                {customAspectRatios.map(ratio => (
+                  <div key={ratio.id} className="relative group">
+                    <button
+                      onClick={() => setAspectRatio({
+                        id: ratio.id,
+                        label: ratio.label,
+                        shapeClass: 'shape-custom',
+                        cssRatio: `${ratio.width}/${ratio.height}`,
+                        width: ratio.width,
+                        height: ratio.height,
+                      })}
+                      className={`w-full flex flex-col items-center justify-center p-2.5 rounded-xl text-xs font-semibold transition-all
+                        ${aspectRatio.id === ratio.id ? 'bg-[var(--accent-color)] text-white shadow-lg' : 'bg-zinc-100/80 text-zinc-600 hover:bg-zinc-200/80 border border-zinc-200/50'}`}
+                    >
+                      <span>{ratio.label}</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteCustomAspectRatio(ratio.id); }}
+                      className="absolute -top-1 -right-1 p-1 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add Custom Aspect Ratio Button */}
+          <button
+            onClick={() => setShowCustomAspectModal(true)}
+            className="w-full mt-3 py-2.5 rounded-xl border-2 border-dashed border-zinc-300 text-xs font-semibold text-zinc-500 hover:border-[var(--accent-color)]/50 hover:text-[var(--accent-color)] hover:bg-[var(--accent-color)]/5 transition-all flex items-center justify-center gap-2"
+          >
+            <Plus size={14} />
+            Add Custom Size
+          </button>
         </section>
 
         {/* Model */}
@@ -1412,7 +1553,7 @@ export default function SpatialImageEditor() {
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 pr-10 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+              className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 pr-10 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 cursor-pointer"
             >
               {models
                 .filter(m => referenceImages.length === 0 || rawModelData[m.value]?.input_modalities?.includes('image'))
@@ -1438,7 +1579,7 @@ export default function SpatialImageEditor() {
           <label className="text-sm font-semibold text-zinc-700">Art Style</label>
           <button
             onClick={() => setShowStyleSelector(true)}
-            className="w-full p-3 rounded-xl bg-zinc-100/80 border border-zinc-200 text-left text-sm font-semibold text-zinc-700 hover:border-[#EF8354]/50 transition-all flex items-center justify-between"
+            className="w-full p-3 rounded-xl bg-zinc-100/80 border border-zinc-200 text-left text-sm font-semibold text-zinc-700 hover:border-[var(--accent-color)]/50 transition-all flex items-center justify-between"
           >
             <span>{selectedStyle.label}</span>
             <ChevronDown size={16} />
@@ -1458,7 +1599,7 @@ export default function SpatialImageEditor() {
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-sm font-semibold text-zinc-700">Style Strength</label>
-              <span className="text-xs font-bold text-[#EF8354] bg-[#EF8354]/10 border border-[#EF8354]/20 px-2 py-0.5 rounded-md">{styleStrength}%</span>
+              <span className="text-xs font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/20 px-2 py-0.5 rounded-md">{styleStrength}%</span>
             </div>
             <input type="range" min="0" max="100" value={styleStrength} onChange={e => setStyleStrength(parseInt(e.target.value))} />
           </div>
@@ -1510,7 +1651,7 @@ export default function SpatialImageEditor() {
                 <textarea
                   value={negativePrompt}
                   onChange={e => setNegativePrompt(e.target.value)}
-                  className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-lg px-3 py-2 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+                  className="w-full bg-zinc-100/80 border border-zinc-200/50 rounded-lg px-3 py-2 text-xs text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 resize-none"
                   placeholder="What to avoid in the image..."
                   rows={2}
                 />
@@ -1586,7 +1727,7 @@ export default function SpatialImageEditor() {
               onClick={(e) => { e.stopPropagation(); handleGenerate(); }}
               disabled={isGenerating}
               className={`text-white px-6 py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0 h-[60px] md:h-16
-                ${isGenerating ? 'bg-zinc-400 shadow-none cursor-not-allowed' : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl hover:shadow-[#EF8354]/30'}`}
+                ${isGenerating ? 'bg-zinc-400 shadow-none cursor-not-allowed' : 'bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] shadow-[var(--accent-color)]/25 hover:shadow-xl hover:shadow-[var(--accent-color)]/30'}`}
             >
               {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
               {isGenerating ? 'Synthesizing...' : 'Generate'}
@@ -1610,13 +1751,13 @@ export default function SpatialImageEditor() {
                 value={customStyle}
                 onChange={e => setCustomStyle(e.target.value)}
                 placeholder="Enter style keywords, e.g., 'cyberpunk, neon lights, futuristic city'..."
-                className="w-full h-32 p-4 rounded-2xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none mb-4"
+                className="w-full h-32 p-4 rounded-2xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 resize-none mb-4"
                 autoFocus
               />
               <button
                 onClick={handleAddCustomStyle}
                 disabled={!customStyle.trim()}
-                className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all shadow-lg"
+                className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all shadow-lg"
               >
                 Add to Prompt
               </button>
@@ -1673,7 +1814,7 @@ export default function SpatialImageEditor() {
               {/* Add Custom Style Button */}
               <button
                 onClick={() => { setShowCustomStyleModal(true); setShowStyleSelector(false); }}
-                className="mb-4 p-3 rounded-xl border-2 border-dashed border-zinc-300 hover:border-[#EF8354]/50 hover:bg-[#EF8354]/5 transition-all flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 hover:text-[#EF8354]"
+                className="mb-4 p-3 rounded-xl border-2 border-dashed border-zinc-300 hover:border-[var(--accent-color)]/50 hover:bg-[var(--accent-color)]/5 transition-all flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 hover:text-[var(--accent-color)]"
               >
                 <Plus size={16} />
                 Create Custom Style
@@ -1683,14 +1824,14 @@ export default function SpatialImageEditor() {
               <div className="flex gap-2 overflow-x-auto pb-3 mb-2 shrink-0">
                 <button
                   onClick={() => setStyleCategory('All')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'All' ? 'bg-[var(--accent-color)] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                     }`}
                 >
                   All
                 </button>
                 <button
                   onClick={() => setStyleCategory('Custom')}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'Custom' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'Custom' ? 'bg-[var(--accent-color)] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                     }`}
                 >
                   Custom
@@ -1699,7 +1840,7 @@ export default function SpatialImageEditor() {
                   <button
                     key={cat}
                     onClick={() => setStyleCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === cat ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === cat ? 'bg-[var(--accent-color)] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                       }`}
                   >
                     {cat}
@@ -1736,8 +1877,8 @@ export default function SpatialImageEditor() {
                     key={style.id}
                     onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
                     className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${selectedStyle.id === style.id
-                      ? 'border-[#EF8354] bg-[#EF8354]/5'
-                      : 'border-zinc-200 bg-white hover:border-[#EF8354]/50'
+                      ? 'border-[var(--accent-color)] bg-[var(--accent-color)]/5'
+                      : 'border-zinc-200 bg-white hover:border-[var(--accent-color)]/50'
                       }`}
                   >
                     <div className="text-lg mb-1">{style.label}</div>
@@ -1769,7 +1910,7 @@ export default function SpatialImageEditor() {
                     value={customStyleName}
                     onChange={e => setCustomStyleName(e.target.value)}
                     placeholder="e.g., My Cyberpunk Style"
-                    className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                    className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20"
                   />
                 </div>
                 <div>
@@ -1778,14 +1919,85 @@ export default function SpatialImageEditor() {
                     value={customStylePrompt}
                     onChange={e => setCustomStylePrompt(e.target.value)}
                     placeholder="e.g., cyberpunk, neon lights, futuristic city, rain-soaked streets..."
-                    className="w-full h-32 p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+                    className="w-full h-32 p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20 resize-none"
                   />
                 </div>
                 <button
                   onClick={handleSaveCustomStyle}
-                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg"
+                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] transition-all shadow-lg"
                 >
                   Save Custom Style
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Custom Aspect Ratio Modal */}
+      {
+        showCustomAspectModal && (
+          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowCustomAspectModal(false)}>
+            <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-sm bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-zinc-800">Custom Image Size</h3>
+                <button onClick={() => setShowCustomAspectModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-600 mb-1 block">Width</label>
+                    <input
+                      type="number"
+                      value={customAspectWidth}
+                      onChange={e => setCustomAspectWidth(e.target.value)}
+                      placeholder="1920"
+                      className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-600 mb-1 block">Height</label>
+                    <input
+                      type="number"
+                      value={customAspectHeight}
+                      onChange={e => setCustomAspectHeight(e.target.value)}
+                      placeholder="1080"
+                      className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)]/20"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 mb-2 block">Unit</label>
+                  <div className="flex gap-2">
+                    {['px', 'in', 'cm', 'mm'].map(unit => (
+                      <button
+                        key={unit}
+                        onClick={() => setCustomAspectUnit(unit)}
+                        className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all
+                          ${customAspectUnit === unit
+                            ? 'bg-[var(--accent-color)] text-white'
+                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border border-zinc-200'}`}
+                      >
+                        {unit === 'px' ? 'Pixels' : unit === 'in' ? 'Inches' : unit === 'cm' ? 'cm' : 'mm'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-zinc-400 text-center">
+                  💡 Common sizes: 1920×1080 (Full HD), 3840×2160 (4K), 1080×1080 (Instagram)
+                </p>
+
+                <button
+                  onClick={handleSaveCustomAspectRatio}
+                  disabled={!customAspectWidth || !customAspectHeight}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all shadow-lg"
+                >
+                  Add Custom Size
                 </button>
               </div>
             </div>
@@ -1860,3 +2072,4 @@ function ComparisonSlider({ leftImage, rightImage }: { leftImage: string; rightI
     </div>
   );
 }
+

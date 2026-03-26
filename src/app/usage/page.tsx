@@ -136,25 +136,25 @@ export default function UsagePage() {
   };
 
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto">
+    <div className="w-full h-[100dvh] relative selection:bg-[var(--accent-color)] selection:text-white overflow-auto">
 
       {/* Top-left nav pill */}
-      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2">
+      <div className="fixed top-4 left-4 md:top-6 md:left-6 z-[70] flex items-center gap-2">
         <div className="glass-pill rounded-full flex items-center p-1.5 pr-4 shadow-sm relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
             <span className="hidden sm:inline">Gallery</span>
           </button>
           <div className="w-px h-4 bg-zinc-200 mx-2"></div>
-          <button className="p-1.5 rounded-full bg-[#EF8354]/10 text-[#EF8354] transition-colors">
+          <button className="p-1.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] transition-colors">
             <BarChart3 size={16} />
           </button>
 
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[60]">
+            <div className="absolute top-full left-0 mt-2 w-56 glass-panel rounded-2xl p-2 shadow-xl animate-slide-down z-[80]">
               <a href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Wand2 size={16} /> Image Generation
               </a>
@@ -164,7 +164,7 @@ export default function UsagePage() {
               <a href="/video" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
                 <Video size={16} /> Video Generation
               </a>
-              <a href="/usage" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#EF8354] bg-[#EF8354]/5 transition-colors">
+              <a href="/usage" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/5 transition-colors">
                 <BarChart3 size={16} /> Usage Dashboard
               </a>
               <a href="/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 hover:bg-black/5 transition-colors">
@@ -182,7 +182,7 @@ export default function UsagePage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#EF8354]/10 flex items-center justify-center text-[#EF8354]">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
               <BarChart3 size={24} />
             </div>
             <div>
@@ -226,7 +226,7 @@ export default function UsagePage() {
               </span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-[#EF8354]">
+              <span className="text-3xl font-bold text-[var(--accent-color)]">
                 {formatCost(totalCost)}
               </span>
               <span className="text-sm text-zinc-400">USD</span>
@@ -255,7 +255,7 @@ export default function UsagePage() {
           <button
             onClick={() => setActiveTab('history')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'history'
-              ? 'bg-white shadow-sm text-[#EF8354]'
+              ? 'bg-white shadow-sm text-[var(--accent-color)]'
               : 'text-zinc-500 hover:text-zinc-700'
               }`}
           >
@@ -267,7 +267,7 @@ export default function UsagePage() {
           <button
             onClick={() => setActiveTab('daily')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'daily'
-              ? 'bg-white shadow-sm text-[#EF8354]'
+              ? 'bg-white shadow-sm text-[var(--accent-color)]'
               : 'text-zinc-500 hover:text-zinc-700'
               }`}
           >
@@ -277,6 +277,40 @@ export default function UsagePage() {
             </div>
           </button>
         </div>
+
+        {/* Visual Chart - Only show in Daily view when we have data */}
+        {activeTab === 'daily' && usageData.length > 0 && (
+          <div className="glass-panel rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-zinc-700 mb-4 flex items-center gap-2">
+              <TrendingUp size={16} className="text-[var(--accent-color)]" />
+              Cost Overview (Last 30 Days)
+            </h3>
+            <div className="flex items-end gap-1 h-32">
+              {(usageData as DailyUsageRecord[]).slice(-14).map((record, i) => {
+                const maxCost = Math.max(...(usageData as DailyUsageRecord[]).map(r => r.cost_usd)) || 1;
+                const height = (record.cost_usd / maxCost) * 100;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                    <div
+                      className="w-full rounded-t-md transition-all hover:opacity-80"
+                      style={{
+                        height: `${Math.max(height, 4)}%`,
+                        backgroundColor: 'var(--accent-color)',
+                        opacity: 0.3 + (height / 100) * 0.7
+                      }}
+                      title={`${record.cost_usd.toFixed(4)}`}
+                    />
+                    <span className="text-[8px] text-zinc-400 -rotate-45 origin-left">{new Date(record.date).getDate()}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between mt-2 text-[10px] text-zinc-400">
+              <span>Oldest</span>
+              <span>Most Recent</span>
+            </div>
+          </div>
+        )}
 
         {/* Export Button */}
         <div className="flex justify-end">
@@ -344,7 +378,7 @@ export default function UsagePage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="text-sm font-bold text-[#EF8354]">{formatCost(record.cost_usd)}</div>
+                        <div className="text-sm font-bold text-[var(--accent-color)]">{formatCost(record.cost_usd)}</div>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="text-sm font-mono text-zinc-500">{record.response_time_ms}ms</div>
@@ -388,7 +422,7 @@ export default function UsagePage() {
                         <div className="text-sm font-bold text-zinc-700">{record.requests}</div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="text-sm font-bold text-[#EF8354]">{formatCost(record.cost_usd)}</div>
+                        <div className="text-sm font-bold text-[var(--accent-color)]">{formatCost(record.cost_usd)}</div>
                       </td>
                     </tr>
                   ))}
@@ -414,3 +448,4 @@ export default function UsagePage() {
     </div>
   );
 }
+

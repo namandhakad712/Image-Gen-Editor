@@ -82,7 +82,7 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
                     key={mode.value}
                     onClick={() => setThemeMode(mode.value)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${themeMode === mode.value
-                            ? 'bg-white dark:bg-zinc-700 text-[#EF8354] shadow-sm'
+                            ? 'bg-white dark:bg-zinc-700 text-[var(--accent-color)] shadow-sm'
                             : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                         }`}
                     title={`Switch to ${mode.label} mode`}
@@ -146,3 +146,4 @@ export function useThemeMode() {
 }
 
 export default ThemeToggle;
+
