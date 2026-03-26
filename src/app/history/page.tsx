@@ -4,10 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutGrid, Settings, Sparkles, X, Trash2,
   Download, Clock, Search, Wand2, History as HistoryIcon,
-  Video, BarChart3
+  Video, BarChart3, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { storage, formatDate } from '@/lib/utils';
+import { formatDate, imageStorage, storage } from '@/lib/utils';
 import { HistoryItem } from '@/types';
 import { gsap } from 'gsap';
 
@@ -20,7 +20,17 @@ export default function HistoryPage() {
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setHistory(storage.getHistory());
+    // Load images from IndexedDB first, fallback to localStorage
+    const loadHistory = async () => {
+      const dbImages = await imageStorage.getAllImages();
+      if (dbImages.length > 0) {
+        setHistory(dbImages);
+      } else {
+        // Fallback to localStorage for legacy data
+        setHistory(storage.getHistory());
+      }
+    };
+    loadHistory();
   }, []);
 
   // Page entrance animation
@@ -47,15 +57,18 @@ export default function HistoryPage() {
     item.model?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    // Remove from both IndexedDB and localStorage
+    await imageStorage.deleteImage(id);
     storage.removeFromHistory(id);
     setHistory(prev => prev.filter(item => item.id !== id));
     if (selectedItem?.id === id) setSelectedItem(null);
     toast.success('Removed from history');
   };
 
-  const handleClearAll = () => {
-    if (confirm('Clear all history?')) {
+  const handleClearAll = async () => {
+    if (confirm('Clear all history? This will delete all saved images.')) {
+      await imageStorage.clearAllImages();
       storage.clearHistory();
       setHistory([]);
       setSelectedItem(null);

@@ -7,7 +7,7 @@ import {
   SlidersHorizontal, Menu, X, Loader2, Trash2, Check,
   Eye, EyeOff, Download, LogIn, Key, ExternalLink,
   History, Image, Wand2, ChevronRight, Video, BarChart3,
-  RotateCcw, RotateCw, Images, ArrowRightLeft
+  RotateCcw, RotateCw, Images, ArrowRightLeft, Lock, Unlock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
@@ -20,6 +20,7 @@ import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS, API_
 import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
 import { gsap } from 'gsap';
 import { animateEntrance, animateModalOpen, animateButtonClick, animateToastIn } from '@/lib/gsapAnimations';
+import { imageDB } from '@/lib/imageStorage';
 
 // No GSAP plugins needed - using native pointer events for better performance
 
@@ -83,7 +84,7 @@ export default function SpatialImageEditor() {
 
   // Canvas State - infinite canvas with multiple images
   const [canvasImages, setCanvasImages] = useState<Array<{
-    id: string; url: string; x: number; y: number; width: number; height: number; prompt: string;
+    id: string; url: string; x: number; y: number; width: number; height: number; prompt: string; seed?: number;
   }>>([]);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -169,6 +170,16 @@ export default function SpatialImageEditor() {
       }
     }
 
+    // Load seed locked state from localStorage
+    const savedSeedLocked = localStorage.getItem('pollinations_seed_locked');
+    if (savedSeedLocked) {
+      try {
+        setSeedLocked(JSON.parse(savedSeedLocked));
+      } catch (e) {
+        console.error('Failed to load seed locked state:', e);
+      }
+    }
+
     // Load custom aspect ratios from localStorage
     const savedAspectRatios = localStorage.getItem('pollinations_custom_aspect_ratios');
     if (savedAspectRatios) {
@@ -180,6 +191,11 @@ export default function SpatialImageEditor() {
       }
     }
   }, []);
+
+  // Save seed locked state to localStorage
+  useEffect(() => {
+    localStorage.setItem('pollinations_seed_locked', JSON.stringify(seedLocked));
+  }, [seedLocked]);
 
   // Save custom style
   const handleSaveCustomStyle = () => {
@@ -291,6 +307,7 @@ export default function SpatialImageEditor() {
   const [negativePrompt, setNegativePrompt] = useState('');
   const [nologo, setNologo] = useState(false);
   const [transparent, setTransparent] = useState(false);
+  const [seedLocked, setSeedLocked] = useState(false);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -324,9 +341,64 @@ export default function SpatialImageEditor() {
         { opacity: 0, y: 30 },
         { opacity: 1, y: 0, duration: 0.5, delay: 0.4, ease: 'power3.out' }
       );
+
+      // Tool buttons entrance
+      gsap.fromTo('.tool-button',
+        { opacity: 0, scale: 0.8 },
+        { opacity: 1, scale: 1, duration: 0.3, stagger: 0.08, delay: 0.5, ease: 'back.out(1.7)' }
+      );
+
+      // Parameter section animations
+      gsap.fromTo('.param-section',
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.4, stagger: 0.1, delay: 0.6, ease: 'power2.out' }
+      );
     });
 
     return () => ctx.revert();
+  }, []);
+
+  // Animate sidebar open/close
+  useEffect(() => {
+    if (isSidebarOpen) {
+      gsap.fromTo('.sidebar-panel',
+        { x: -100, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.35, ease: 'power3.out' }
+      );
+    }
+  }, [isSidebarOpen]);
+
+  // Animate generate button hover
+  const generateBtnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const btn = generateBtnRef.current;
+    if (!btn) return;
+
+    const handleMouseEnter = () => {
+      gsap.to(btn, {
+        scale: 1.02,
+        boxShadow: '0 10px 40px -10px var(--accent-color)',
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    };
+
+    const handleMouseLeave = () => {
+      gsap.to(btn, {
+        scale: 1,
+        boxShadow: '0 4px 20px -5px var(--accent-color)',
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    };
+
+    btn.addEventListener('mouseenter', handleMouseEnter);
+    btn.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      btn.removeEventListener('mouseenter', handleMouseEnter);
+      btn.removeEventListener('mouseleave', handleMouseLeave);
+    };
   }, []);
 
   // Button click animation handler
@@ -712,11 +784,16 @@ export default function SpatialImageEditor() {
         x: staggeredX, y: staggeredY,
         width: aspectRatio.width, height: aspectRatio.height,
         prompt: fullPrompt,
+        seed: actualSeed,
       };
       const newImages = [...canvasImages, newImg];
       setCanvasImages(newImages);
       setSelectedImageId(newImg.id);
-      setSeed(actualSeed);
+
+      // Only update seed display if not locked - keep the value for reference but reset to -1 for next generation
+      if (!seedLocked) {
+        setSeed(-1);
+      }
 
       // Save history with correct type
       const historyItem: HistoryItem = {
@@ -889,13 +966,14 @@ export default function SpatialImageEditor() {
   };
 
   // Generate variation of an image
-  const generateVariations = async (image: { id: string; url: string; prompt: string }) => {
+  const generateVariations = async (image: { id: string; url: string; prompt: string; seed?: number }) => {
     if (!hasApiKey) { toast.error('Add API key first'); return; }
     setGeneratingVariations(image.id);
     setVariationBaseImage(image);
 
     try {
-      const variationSeed = Math.floor(Math.random() * 999999999);
+      // Use the saved seed from the image if available, otherwise generate random
+      const variationSeed = image.seed && image.seed !== -1 ? image.seed : Math.floor(Math.random() * 999999999);
       const canvasImg = canvasImages.find(img => img.id === image.id);
       const params: GenerationParams = {
         model: selectedModel,
@@ -1335,7 +1413,7 @@ export default function SpatialImageEditor() {
       {!isSidebarOpen && (
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="fixed top-1/2 left-[88vw] md:left-[348px] -translate-y-1/2 z-40 p-2.5 glass-panel rounded-full shadow-lg hover:scale-110 transition-all backdrop-blur-xl bg-white/80 group"
+          className="fixed top-1/2 left-[88vw] md:left-[348px] md:bottom-36 -translate-y-1/2 z-40 p-2.5 glass-panel rounded-full shadow-lg hover:scale-110 transition-all backdrop-blur-xl bg-white/80 group"
         >
           <ChevronRight size={18} className="text-zinc-600 group-hover:text-[var(--accent-color)] transition-colors" />
         </button>
@@ -1389,10 +1467,13 @@ export default function SpatialImageEditor() {
           LEFT PANEL: PARAMETERS SIDEBAR
       ========================================= */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
       )}
 
-      <aside className={`sidebar-panel fixed top-16 bottom-4 md:top-20 md:bottom-8 left-4 md:left-6 w-[85vw] md:w-[340px] max-w-[340px] glass-panel rounded-[28px] p-4 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
+      <aside className={`sidebar-panel fixed top-16 bottom-[160px] md:top-20 md:bottom-36 left-4 md:left-6 w-[85vw] md:w-[340px] max-w-[340px] glass-panel rounded-[28px] p-4 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:-translate-x-[120%]'}`}>
 
         {/* Close button for mobile */}
@@ -1658,9 +1739,24 @@ export default function SpatialImageEditor() {
               </div>
 
               <div className="flex items-center justify-between gap-4">
-                <label className="text-xs font-semibold text-zinc-600 shrink-0">Seed</label>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-zinc-600 shrink-0">Seed</label>
+                  <button
+                    onClick={() => setSeedLocked(!seedLocked)}
+                    className={`p-1 rounded-md transition-colors ${seedLocked ? 'text-[var(--accent-color)] bg-[var(--accent-color)]/10' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100'}`}
+                    title={seedLocked ? 'Unlock seed (will reset to random after generation)' : 'Lock seed (keep same seed for variations)'}
+                  >
+                    {seedLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                </div>
                 <div className="flex flex-1 items-center bg-zinc-100/80 rounded-lg px-3 py-1.5 border border-zinc-200/50">
-                  <input type="number" value={seed} onChange={e => setSeed(Number(e.target.value))} className="w-full bg-transparent text-xs font-mono text-zinc-700 focus:outline-none" placeholder="-1 = random" />
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={e => setSeed(Number(e.target.value))}
+                    className="w-full bg-transparent text-xs font-mono text-zinc-700 focus:outline-none"
+                    placeholder="-1 = random"
+                  />
                 </div>
               </div>
               <div className="flex items-center justify-between gap-4">
@@ -1678,8 +1774,8 @@ export default function SpatialImageEditor() {
       {/* =========================================
           BOTTOM PANEL: PROMPT & GENERATE
       ========================================= */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
-        <div className="glass-panel rounded-t-[32px] rounded-b-none p-4 md:p-6 w-full max-w-4xl mx-auto pointer-events-auto shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] backdrop-blur-xl bg-white/70 border-t border-white/20">
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-2 md:pb-6">
+        <div className="glass-panel rounded-t-[32px] rounded-b-none p-4 md:p-6 w-full max-w-4xl mx-4 md:mx-auto pointer-events-auto shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] backdrop-blur-xl bg-white/70 border-t border-x border-white/20">
 
           {/* Pen tools - show when pen is active */}
           {activeTool === 'pen' && (
@@ -1724,6 +1820,7 @@ export default function SpatialImageEditor() {
               />
             </div>
             <button
+              ref={generateBtnRef}
               onClick={(e) => { e.stopPropagation(); handleGenerate(); }}
               disabled={isGenerating}
               className={`text-white px-6 py-4 rounded-2xl font-bold text-sm md:text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 shrink-0 h-[60px] md:h-16

@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
   HISTORY: 'pollinations_history',
   SETTINGS: 'pollinations_settings',
   CACHE: 'pollinations_cache',
+  IMAGES_DB: 'pollinations_images',
 };
 
 // In-memory cache for super-fast access
@@ -111,14 +112,14 @@ export const storage = {
   // History (with compression and cache)
   getHistory(): HistoryItem[] {
     if (typeof window === 'undefined') return [];
-    
+
     // Check cache first
     const cached = cache[STORAGE_KEYS.HISTORY] as HistoryItem[] | undefined;
     if (cached) return cached;
-    
+
     const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
     if (!data) return [];
-    
+
     try {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
@@ -163,10 +164,10 @@ export const storage = {
     if (typeof window === 'undefined') return {};
     const cached = cache[STORAGE_KEYS.SETTINGS] as Record<string, unknown> | undefined;
     if (cached) return cached;
-    
+
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (!data) return {};
-    
+
     try {
       const parsed = decompress<Record<string, unknown>>(data);
       cache[STORAGE_KEYS.SETTINGS] = parsed;
@@ -186,14 +187,14 @@ export const storage = {
   getCached<T>(key: string): T | null {
     const cached = cache[key];
     const timestamp = cacheTimestamps[key];
-    
+
     if (!cached || !timestamp) return null;
     if (Date.now() - timestamp > CACHE_TTL) {
       delete cache[key];
       delete cacheTimestamps[key];
       return null;
     }
-    
+
     return cached as T;
   },
 
@@ -299,5 +300,175 @@ export const urlCacheUtil = {
   },
   clear(): void {
     urlCache.clear();
+  },
+};
+
+// =============================================
+// IndexedDB for persistent image storage
+// =============================================
+const DB_NAME = 'pollinations_images_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'images';
+
+let dbInstance: IDBDatabase | null = null;
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (dbInstance) {
+      resolve(dbInstance);
+      return;
+    }
+
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => {
+      console.error('Failed to open IndexedDB:', request.error);
+      reject(request.error);
+    };
+
+    request.onsuccess = () => {
+      dbInstance = request.result;
+      resolve(dbInstance);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        store.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+    };
+  });
+}
+
+export const imageStorage = {
+  async saveImage(item: HistoryItem): Promise<boolean> {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.put({
+          id: item.id,
+          imageUrl: item.imageUrl,
+          prompt: item.prompt,
+          model: item.model,
+          createdAt: item.createdAt,
+          params: item.params,
+          type: item.type,
+          referenceImage: item.referenceImage,
+        });
+
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => {
+          console.error('Failed to save image to IndexedDB:', request.error);
+          resolve(false);
+        };
+      });
+    } catch (error) {
+      console.error('Error saving image:', error);
+      return false;
+    }
+  },
+
+  async getImage(id: string): Promise<HistoryItem | null> {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(id);
+
+        request.onsuccess = () => {
+          if (request.result) {
+            resolve(request.result as HistoryItem);
+          } else {
+            resolve(null);
+          }
+        };
+        request.onerror = () => resolve(null);
+      });
+    } catch (error) {
+      console.error('Error getting image:', error);
+      return null;
+    }
+  },
+
+  async getAllImages(): Promise<HistoryItem[]> {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const index = store.index('createdAt');
+        const request = index.openCursor(null, 'prev'); // Most recent first
+
+        const items: HistoryItem[] = [];
+
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            items.push(cursor.value as HistoryItem);
+            cursor.continue();
+          } else {
+            resolve(items);
+          }
+        };
+
+        request.onerror = () => resolve([]);
+      });
+    } catch (error) {
+      console.error('Error getting all images:', error);
+      return [];
+    }
+  },
+
+  async deleteImage(id: string): Promise<boolean> {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.delete(id);
+
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => resolve(false);
+      });
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      return false;
+    }
+  },
+
+  async clearAllImages(): Promise<boolean> {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.clear();
+
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => resolve(false);
+      });
+    } catch (error) {
+      console.error('Error clearing images:', error);
+      return false;
+    }
+  },
+
+  async getStorageEstimate(): Promise<{ usage: number; quota: number }> {
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const estimate = await navigator.storage.estimate();
+        return {
+          usage: estimate.usage || 0,
+          quota: estimate.quota || 0,
+        };
+      }
+      return { usage: 0, quota: 0 };
+    } catch {
+      return { usage: 0, quota: 0 };
+    }
   },
 };

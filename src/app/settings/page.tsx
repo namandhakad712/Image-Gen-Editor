@@ -295,7 +295,7 @@ export default function SettingsPage() {
           {/* API Key Card */}
           <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl md:col-span-1">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-orange-400 flex items-center justify-center text-white shadow-lg">
                 <Key size={18} />
               </div>
               <div>
@@ -422,7 +422,7 @@ export default function SettingsPage() {
           <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-lg">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-orange-400 flex items-center justify-center text-white shadow-lg">
                   <Palette size={18} />
                 </div>
                 <div>
@@ -465,20 +465,29 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Preset Grid - Only 4 popular colors */}
+                {/* Preset Colors - with Black as default/selected */}
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Popular Choices</label>
-                  <div className="flex gap-2">
-                    {['#EF8354', '#3B82F6', '#8B5CF6', '#10B981'].map(color => (
+                  <label className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Quick Select</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: 'Black', value: '#000000' },
+                      { name: 'Orange', value: '#F97316' },
+                      { name: 'Blue', value: '#3B82F6' },
+                      { name: 'Purple', value: '#8B5CF6' },
+                      { name: 'Green', value: '#10B981' },
+                      { name: 'Pink', value: '#EC4899' },
+                      { name: 'Red', value: '#EF4444' },
+                      { name: 'Teal', value: '#14B8A6' },
+                    ].map(color => (
                       <button
-                        key={color}
-                        onClick={() => { setAccentColor(color); toast.success(`Theme color updated`); }}
-                        className={`w-10 h-10 rounded-xl transition-all hover:scale-110 ${accentColor === color
-                          ? 'ring-2 ring-offset-2 ring-zinc-400 scale-105'
-                          : 'hover:shadow-md'
-                          }`}
-                        style={{ backgroundColor: color }}
-                        title={color}
+                        key={color.value}
+                        onClick={() => {
+                          setAccentColor(color.value);
+                          toast.success(`Theme color updated to ${color.name}`);
+                        }}
+                        className={`w-10 h-10 rounded-xl border-2 transition-all hover:scale-110 ${accentColor === color.value ? 'border-zinc-800 ring-2 ring-zinc-400 scale-110' : 'border-zinc-200'}`}
+                        style={{ backgroundColor: color.value }}
+                        title={color.name}
                       />
                     ))}
                   </div>
@@ -495,7 +504,7 @@ export default function SettingsPage() {
           <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent-color)] to-orange-400 flex items-center justify-center text-white shadow-lg">
                   <Images size={18} />
                 </div>
                 <div>

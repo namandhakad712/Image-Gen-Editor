@@ -47,13 +47,34 @@ export default function VideoPage() {
   // Page entrance animation
   useEffect(() => {
     const ctx = gsap.context(() => {
+      // Main content entrance
       gsap.fromTo('.video-content',
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
       );
+
+      // Header section animation
+      gsap.fromTo('.video-header',
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out', delay: 0.1 }
+      );
+
+      // Form sections staggered animation
       gsap.fromTo('.video-section',
         { opacity: 0, scale: 0.95, y: 20 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.1, ease: 'power2.out', delay: 0.2 }
+        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.15, ease: 'power2.out', delay: 0.2 }
+      );
+
+      // Button animations
+      gsap.fromTo('.video-btn',
+        { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1, duration: 0.3, stagger: 0.08, delay: 0.4, ease: 'back.out(1.7)' }
+      );
+
+      // Input elements animation
+      gsap.fromTo('.video-input',
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.3, stagger: 0.05, delay: 0.3, ease: 'power2.out' }
       );
     });
     return () => ctx.revert();
@@ -216,7 +237,7 @@ export default function VideoPage() {
       <div className="video-content max-w-4xl mx-auto pt-24 px-4 pb-10 space-y-6">
 
         {/* Header */}
-        <div className="flex items-center gap-3">
+        <div className="video-header flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
             <Film size={24} />
           </div>
@@ -276,7 +297,7 @@ export default function VideoPage() {
         <div className="video-section glass-panel rounded-3xl p-6 space-y-6">
 
           {/* Prompt */}
-          <div className="space-y-2">
+          <div className="video-input space-y-2">
             <label className="text-sm font-semibold text-zinc-700">Video Prompt</label>
             <textarea
               value={prompt}
@@ -418,7 +439,7 @@ export default function VideoPage() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !hasApiKey}
-            className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${isGenerating || !hasApiKey
+            className={`video-btn w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${isGenerating || !hasApiKey
               ? 'bg-zinc-400 cursor-not-allowed shadow-none'
               : 'bg-[var(--accent-color)] hover:bg-[var(--accent-color-dark)] shadow-[var(--accent-color)]/25 hover:shadow-xl text-white'
               }`}

@@ -6,9 +6,9 @@
 
 /* Theme Colors - CSS Variables */
 :root {
-  --accent-color: var(--accent-color);
-  --accent-color-light: rgba(239, 131, 84, 0.2);
-  --accent-color-border: rgba(239, 131, 84, 0.4);
+  --accent-color: #000000;
+  --accent-color-light: rgba(0, 0, 0, 0.2);
+  --accent-color-border: rgba(0, 0, 0, 0.4);
 }
 
 * {

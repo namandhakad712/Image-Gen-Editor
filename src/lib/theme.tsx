@@ -9,7 +9,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType>({
   accentColor: 'var(--accent-color)',
-  setAccentColor: () => {},
+  setAccentColor: () => { },
 });
 
 export const useTheme = () => useContext(ThemeContext);
@@ -31,7 +31,7 @@ export const COLOR_PALETTE = [
 ];
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [accentColor, setAccentColorState] = useState('var(--accent-color)');
+  const [accentColor, setAccentColorState] = useState('#000000');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

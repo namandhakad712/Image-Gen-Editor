@@ -34,13 +34,34 @@ export default function EditPage() {
   // Page entrance animation
   useEffect(() => {
     const ctx = gsap.context(() => {
+      // Main content entrance
       gsap.fromTo('.edit-content',
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
       );
+
+      // Header section animation
+      gsap.fromTo('.edit-header',
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out', delay: 0.1 }
+      );
+
+      // Form sections staggered animation
       gsap.fromTo('.edit-section',
         { opacity: 0, scale: 0.95, y: 20 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.1, ease: 'power2.out', delay: 0.2 }
+        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.15, ease: 'power2.out', delay: 0.2 }
+      );
+
+      // Button animations
+      gsap.fromTo('.edit-btn',
+        { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1, duration: 0.3, stagger: 0.08, delay: 0.4, ease: 'back.out(1.7)' }
+      );
+
+      // Input elements animation
+      gsap.fromTo('.edit-input',
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.3, stagger: 0.05, delay: 0.3, ease: 'power2.out' }
       );
     });
     return () => ctx.revert();
@@ -185,7 +206,7 @@ export default function EditPage() {
       <div className="edit-content max-w-5xl mx-auto pt-24 px-4 pb-10 space-y-6">
 
         {/* Header */}
-        <div className="flex items-center gap-3">
+        <div className="edit-header flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)]">
             <ImagePlus size={20} />
           </div>
