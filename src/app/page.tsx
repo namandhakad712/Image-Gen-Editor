@@ -19,6 +19,8 @@ import { useTheme } from '@/lib/theme';
 import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS, API_HELPERS } from '@/lib/apiConfig';
 import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
 
+// No GSAP plugins needed - using native pointer events for better performance
+
 // =============================================
 //  CONSTANTS
 // =============================================
@@ -78,11 +80,7 @@ export default function SpatialImageEditor() {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  // Image dragging state
-  const [isDraggingImage, setIsDraggingImage] = useState(false);
-  const [dragImageId, setDragImageId] = useState<string | null>(null);
-  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const [dragImageStartPos, setDragImageStartPos] = useState({ x: 0, y: 0 });
+  // Ref for tracking canvas images
 
   // Pen drawing state
   const [penStrokes, setPenStrokes] = useState<Array<{
@@ -194,12 +192,10 @@ export default function SpatialImageEditor() {
   const [transparent, setTransparent] = useState(false);
 
   // Refs
+  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
-
-  // =============================================
-  //  Live Models Fetch (Image models only)
   // =============================================
   useEffect(() => {
     // Fetch from centralized API config
@@ -280,9 +276,21 @@ export default function SpatialImageEditor() {
     }
   }, []);
 
-  // =============================================
-  //  INFINITE CANVAS: Pan & Zoom
-  // =============================================
+  // Pan handler for canvas (hand tool or middle click)
+  const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isPanning) return;
+    e.preventDefault();
+    setPan({
+      x: e.clientX - panStart.x,
+      y: e.clientY - panStart.y,
+    });
+  }, [isPanning, panStart]);
+
+  const handleCanvasPointerUp = useCallback((e: React.PointerEvent) => {
+    if (isPanning) {
+      setIsPanning(false);
+    }
+  }, [isPanning]);
   const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
     // Only pan with hand tool or middle click
     if (activeTool === 'hand' || e.button === 1) {
@@ -297,59 +305,68 @@ export default function SpatialImageEditor() {
     }
   }, [activeTool, pan]);
 
-  // Handle image drag start
+  // Custom pointer-based drag handler for buttery smooth dragging with GPU acceleration
   const handleImagePointerDown = useCallback((e: React.PointerEvent, imageId: string) => {
-    e.stopPropagation();
     if (activeTool !== 'pointer') return;
+    e.preventDefault();
+    e.stopPropagation();
 
     const img = canvasImages.find(i => i.id === imageId);
     if (!img) return;
 
-    // Capture pointer for smooth dragging even if cursor moves outside
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-
-    // Store starting positions for delta calculation
-    setDragStartPos({ x: e.clientX, y: e.clientY });
-    setDragImageStartPos({ x: img.x, y: img.y });
-    setDragImageId(imageId);
-    setIsDraggingImage(true);
     setSelectedImageId(imageId);
-  }, [activeTool, canvasImages]);
 
-  // Handle image dragging with smooth delta-based movement
-  const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
-    if (isPanning) {
-      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
-      return;
-    }
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialImgX = img.x;
+    const initialImgY = img.y;
 
-    // Handle image dragging with buttery smooth delta calculation
-    if (isDraggingImage && dragImageId && activeTool === 'pointer') {
-      // Calculate delta from drag start position
-      const deltaX = (e.clientX - dragStartPos.x) / zoom;
-      const deltaY = (e.clientY - dragStartPos.y) / zoom;
+    // Track if we're dragging
+    let isDragging = false;
+    const DRAG_THRESHOLD = 3; // pixels to consider as drag vs click
 
-      // Apply delta to the starting position
-      const newX = dragImageStartPos.x + deltaX;
-      const newY = dragImageStartPos.y + deltaY;
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
 
-      setCanvasImages(prev => prev.map(img =>
-        img.id === dragImageId
-          ? { ...img, x: newX, y: newY }
-          : img
-      ));
-    }
-  }, [isPanning, panStart, isDraggingImage, dragImageId, dragStartPos, dragImageStartPos, zoom, activeTool]);
+      // Check if we've moved enough to consider it a drag
+      if (!isDragging && (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD)) {
+        isDragging = true;
+      }
 
-  // Handle pointer up - release capture and stop dragging
-  const handleCanvasPointerUp = useCallback((e: React.PointerEvent) => {
-    if (isDraggingImage && dragImageId) {
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    }
-    setIsPanning(false);
-    setIsDraggingImage(false);
-    setDragImageId(null);
-  }, [isDraggingImage, dragImageId]);
+      if (isDragging) {
+        // Calculate new position accounting for zoom
+        const newX = initialImgX + deltaX / zoom;
+        const newY = initialImgY + deltaY / zoom;
+
+        // Update position immediately for smooth 60fps rendering
+        setCanvasImages(prev => prev.map(i =>
+          i.id === imageId ? { ...i, x: newX, y: newY } : i
+        ));
+      }
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      // Clean up event listeners
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+
+      if (isDragging) {
+        // Save final position to localStorage
+        const currentImg = canvasImages.find(i => i.id === imageId);
+        if (currentImg) {
+          const updatedImages = canvasImages.map(i =>
+            i.id === imageId ? { ...i, x: currentImg.x, y: currentImg.y } : i
+          );
+          localStorage.setItem('pollinations_canvas_images', JSON.stringify(updatedImages));
+        }
+      }
+      // If not dragging (just a click), selection is already handled
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  }, [activeTool, zoom, canvasImages]);
 
   // Zoom with scroll wheel
   useEffect(() => {
@@ -950,7 +967,7 @@ export default function SpatialImageEditor() {
   //  RENDER
   // =============================================
   return (
-    <div className="w-full h-[100dvh] relative overflow-hidden" style={{ selectionColor: accentColor }}>
+    <div className="w-full h-[100dvh] relative overflow-hidden">
 
       {/* =========================================
           INFINITE CANVAS (full viewport)
@@ -972,24 +989,22 @@ export default function SpatialImageEditor() {
           {canvasImages.map((img, index) => (
             <div
               key={img.id}
-              className={`absolute group ${isDraggingImage && dragImageId === img.id ? 'transition-none' : 'transition-all duration-200'} ${selectedImageId === img.id
-                ? 'ring-4 ring-offset-2 ring-offset-white/30 shadow-2xl'
+              className={`absolute group ${selectedImageId === img.id
+                ? 'ring-4 ring-offset-2 ring-offset-white/30 shadow-2xl ring-[#EF8354]'
                 : 'hover:ring-2 hover:shadow-xl'
-                } ${activeTool === 'pointer' ? 'cursor-grab' : 'cursor-default'} ${isDraggingImage && dragImageId === img.id ? '!cursor-grabbing' : ''}`}
+                } ${activeTool === 'pointer' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
               style={{
                 left: img.x,
                 top: img.y,
                 width: img.width,
                 height: img.height,
                 zIndex: selectedImageId === img.id ? 100 : index,
-                ringColor: accentColor,
-                ringOffsetColor: 'rgba(255,255,255,0.3)',
                 boxShadow: selectedImageId === img.id ? `0 20px 50px -12px ${accentColor}66` : undefined,
-                // GPU acceleration for smooth dragging
-                transform: 'translate3d(0,0,0)',
-                willChange: isDraggingImage && dragImageId === img.id ? 'transform, left, top' : 'auto',
+                // GPU acceleration for smooth movement
+                transform: 'translateZ(0)',
+                willChange: 'left, top',
+                backfaceVisibility: 'hidden',
               }}
-              onClick={(e) => { e.stopPropagation(); if (activeTool === 'pointer') setSelectedImageId(img.id); }}
               onPointerDown={(e) => handleImagePointerDown(e, img.id)}
             >
               <img
@@ -1017,7 +1032,6 @@ export default function SpatialImageEditor() {
                   onClick={(e) => { e.stopPropagation(); generateVariations({ id: img.id, url: img.url, prompt: img.prompt }); }}
                   disabled={generatingVariations === img.id}
                   className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md disabled:opacity-50"
-                  style={{ hoverColor: accentColor }}
                 >
                   {generatingVariations === img.id ? (
                     <Loader2 size={12} className="animate-spin" />
