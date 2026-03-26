@@ -16,7 +16,7 @@ import { HistoryItem, GenerationParams } from '@/types';
 import { ART_STYLES, STYLE_CATEGORIES, ArtStyle } from '@/lib/styles';
 import { generateRandomPrompt, getRandomAppend, processPromptVariables } from '@/lib/prompts';
 import { useTheme } from '@/lib/theme';
-import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS } from '@/lib/apiConfig';
+import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS, API_HELPERS } from '@/lib/apiConfig';
 import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
 
 // =============================================
@@ -202,7 +202,7 @@ export default function SpatialImageEditor() {
   // =============================================
   useEffect(() => {
     // Fetch from centralized API config
-    fetch(API_CONFIG.getModelsUrl('image'))
+    fetch(API_HELPERS.getModelsUrl('image'))
       .then(res => res.json())
       .then((data: any[]) => {
         console.log('📦 All models from API:', data.length);
