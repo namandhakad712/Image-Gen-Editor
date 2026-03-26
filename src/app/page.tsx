@@ -742,58 +742,46 @@ export default function SpatialImageEditor() {
     }
   };
 
-  // Generate variations of an image
+  // Generate variation of an image
   const generateVariations = async (image: {id: string; url: string; prompt: string}) => {
     if (!hasApiKey) { toast.error('Add API key first'); return; }
     setGeneratingVariations(image.id);
     setVariationBaseImage(image);
     
     try {
-      const baseSeed = Math.floor(Math.random() * 999999999);
-      const variations = [];
+      const variationSeed = Math.floor(Math.random() * 999999999);
+      const canvasImg = canvasImages.find(img => img.id === image.id);
+      const params: GenerationParams = {
+        model: selectedModel,
+        prompt: image.prompt,
+        width: canvasImg?.width || 1024,
+        height: canvasImg?.height || 1024,
+        seed: variationSeed,
+        enhance,
+        safe,
+        quality: 'high' as const,
+      };
       
-      // Generate 4 variations with different seeds
-      for (let i = 0; i < 4; i++) {
-        const variationSeed = baseSeed + i * 1000;
-        const canvasImg = canvasImages.find(img => img.id === image.id);
-        const params: GenerationParams = {
-          model: selectedModel,
-          prompt: image.prompt,
-          width: canvasImg?.width || 1024,
-          height: canvasImg?.height || 1024,
-          seed: variationSeed,
-          enhance,
-          safe,
-          quality: 'high' as const,
-        };
-        
-        const imageUrl = await pollinationsAPI.generateImage(params);
-        variations.push({
-          id: generateId(),
-          url: imageUrl,
-          prompt: image.prompt,
-          width: params.width,
-          height: params.height,
-          x: 0, y: 0,
-        });
-      }
+      const imageUrl = await pollinationsAPI.generateImage(params);
       
-      // Add variations to canvas in a grid
-      const startX = (-pan.x + window.innerWidth / 2) / zoom - 200;
-      const startY = (-pan.y + window.innerHeight / 2) / zoom + 300;
+      // Add variation to canvas slightly offset
+      const newVariation = {
+        id: generateId(),
+        url: imageUrl,
+        prompt: image.prompt,
+        width: params.width,
+        height: params.height,
+        x: (canvasImg?.x || 0) + 50, 
+        y: (canvasImg?.y || 0) + 50,
+      };
       
-      variations.forEach((v, i) => {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        v.x = startX + col * 250;
-        v.y = startY + row * 250;
-        setCanvasImages(prev => [...prev, v]);
-      });
+      setCanvasImages(prev => [...prev, newVariation]);
+      setSelectedImageId(newVariation.id);
       
-      toast.success('4 variations generated!');
+      toast.success('Variation generated!');
     } catch (error) {
       console.error('Variation error:', error);
-      toast.error('Failed to generate variations');
+      toast.error('Failed to generate variation');
     } finally {
       setGeneratingVariations(null);
     }
@@ -1000,9 +988,19 @@ export default function SpatialImageEditor() {
               <img
                 src={img.url}
                 alt={img.prompt}
-                className="w-full h-full object-cover rounded-2xl shadow-lg backdrop-blur-sm pointer-events-none"
+                className="w-full h-full object-cover rounded-2xl shadow-lg pointer-events-none"
                 draggable={false}
               />
+              
+              {/* Generation overlay for variations */}
+              {generatingVariations === img.id && (
+                <div className="absolute inset-0 bg-white/40 rounded-2xl flex items-center justify-center backdrop-blur-sm z-50">
+                  <div className="bg-white/80 p-4 rounded-full flex flex-col items-center justify-center gap-2 shadow-xl border border-zinc-100">
+                    <Loader2 size={32} className="animate-spin text-[#EF8354]" />
+                    <span className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Generating...</span>
+                  </div>
+                </div>
+              )}
 
               {/* Hover actions - responsive size based on image */}
               <div className={`absolute -top-3 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
@@ -1019,7 +1017,7 @@ export default function SpatialImageEditor() {
                   ) : (
                     <Images size={12} />
                   )}
-                  <span className="hidden sm:inline">{generatingVariations === img.id ? '...' : 'Variations'}</span>
+                  <span className="hidden sm:inline">{generatingVariations === img.id ? 'Loading' : 'Variation'}</span>
                 </button>
                 
                 <button

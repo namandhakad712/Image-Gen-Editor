@@ -120,9 +120,13 @@ export const storage = {
     if (!data) return [];
     
     try {
-      const parsed = decompress<HistoryItem[]>(data);
-      cache[STORAGE_KEYS.HISTORY] = parsed;
-      return parsed;
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        const history = parsed.map(decompressHistoryItem);
+        cache[STORAGE_KEYS.HISTORY] = history;
+        return history;
+      }
+      return [];
     } catch {
       return [];
     }

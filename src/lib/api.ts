@@ -305,7 +305,33 @@ export class PollinationsAPI {
     }
 
     const data = await response.json();
-    return data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
+    const item = data.data?.[0];
+    if (!item) return '';
+
+    if (item.url) {
+      if (item.url.startsWith('blob:') || item.url.startsWith('data:')) {
+        return item.url;
+      }
+      return item.url;
+    }
+
+    if (item.b64_json) {
+      const b64 = item.b64_json;
+      if (b64.startsWith('data:')) return b64;
+
+      try {
+        const byteChars = atob(b64);
+        const byteNumbers = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteNumbers[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: 'image/jpeg' });
+        return URL.createObjectURL(blob);
+      } catch (e) {
+        return `data:image/jpeg;base64,${b64}`;
+      }
+    }
+    return '';
   }
 
   async checkBalance(): Promise<number | null> {
