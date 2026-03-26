@@ -144,3 +144,48 @@ export interface ApiKeyInfo {
   pollenBudget?: number | null;
   rateLimitEnabled?: boolean;
 }
+
+/**
+ * Canvas Image
+ * Represents an image on the infinite canvas
+ */
+export interface CanvasImage {
+  id: string;
+  url: string;
+  thumbnailUrl?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  prompt: string;
+  model?: string;
+  seed?: number;
+  createdAt?: number;
+}
+
+/**
+ * Pen Stroke
+ * Represents a drawing stroke on the canvas
+ */
+export interface PenStroke {
+  id: string;
+  points: { x: number; y: number }[];
+  color: string;
+  imageId?: string;
+}
+
+/**
+ * App Settings
+ * User preferences and settings
+ */
+export interface AppSettings {
+  themeColor: string;
+  themeMode: 'light' | 'dark' | 'system';
+  defaultModel?: string;
+  defaultAspectRatio?: string;
+  enableSafeMode?: boolean;
+  enableEnhance?: boolean;
+  showAdvancedSettings?: boolean;
+  recentPrompts?: string[];
+  favoriteStyles?: string[];
+}

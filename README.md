@@ -4,7 +4,7 @@
 
 ### _Transform your imagination into stunning AI-powered visuals_
 
-![Banner](https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=1200&h=400&fit=crop)
+[![Banner](https://i.postimg.cc/wj2q1F7J/Screenshot-2026-03-26-181053.png)](https://postimg.cc/NKyqV68f)
 
 [![Built with Pollinations](https://img.shields.io/badge/Built%20with-Pollinations-8a2be2?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmNjYwMCIgZD0iTTEyIDJMMTQgN2w1LTFsLTMgNCAzIDRsLTUgMWwyIDVsLTQtMy00IDMgMi01LTUtMSAzLTRsLTMtNCA1IDF6Ii8+PC9zdmc+)](https://pollinations.ai)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=next.js)](https://nextjs.org)
