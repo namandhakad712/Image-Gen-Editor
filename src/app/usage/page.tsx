@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutGrid, Settings, Wand2, History, Video, Zap,
   TrendingUp, DollarSign, Clock, Calendar, Download,
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
 import { storage } from '@/lib/utils';
 import { UsageRecord, DailyUsageRecord } from '@/types';
+import { gsap } from 'gsap';
 
 type Tab = 'history' | 'daily';
 
@@ -22,6 +23,21 @@ export default function UsagePage() {
   const [balance, setBalance] = useState<number | null>(null);
   const [totalCost, setTotalCost] = useState(0);
   const [totalRequests, setTotalRequests] = useState(0);
+
+  // Page entrance animation
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo('.usage-content',
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
+      );
+      gsap.fromTo('.usage-card',
+        { opacity: 0, scale: 0.95, y: 20 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.08, ease: 'power2.out', delay: 0.15 }
+      );
+    });
+    return () => ctx.revert();
+  }, []);
 
   useEffect(() => {
     const savedKey = storage.getApiKey();
@@ -71,7 +87,7 @@ export default function UsagePage() {
       const data = activeTab === 'history'
         ? await pollinationsAPI.getUsage(5000, 'csv')
         : await pollinationsAPI.getDailyUsage(90, 'csv');
-      
+
       if (data && typeof data === 'string') {
         const blob = new Blob([data], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
@@ -161,7 +177,7 @@ export default function UsagePage() {
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
 
       {/* Main content */}
-      <div className="max-w-6xl mx-auto pt-24 px-4 pb-10 space-y-6">
+      <div className="usage-content max-w-6xl mx-auto pt-24 px-4 pb-10 space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -185,7 +201,7 @@ export default function UsagePage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Balance */}
-          <div className="glass-panel rounded-2xl p-5 space-y-2">
+          <div className="usage-card glass-panel rounded-2xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-zinc-500">
               <Zap size={16} />
               <span className="text-xs font-semibold uppercase tracking-wider">Pollen Balance</span>
@@ -202,7 +218,7 @@ export default function UsagePage() {
           </div>
 
           {/* Total Cost */}
-          <div className="glass-panel rounded-2xl p-5 space-y-2">
+          <div className="usage-card glass-panel rounded-2xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-zinc-500">
               <DollarSign size={16} />
               <span className="text-xs font-semibold uppercase tracking-wider">
@@ -218,7 +234,7 @@ export default function UsagePage() {
           </div>
 
           {/* Total Requests */}
-          <div className="glass-panel rounded-2xl p-5 space-y-2">
+          <div className="usage-card glass-panel rounded-2xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-zinc-500">
               <Activity size={16} />
               <span className="text-xs font-semibold uppercase tracking-wider">
@@ -238,11 +254,10 @@ export default function UsagePage() {
         <div className="glass-panel rounded-2xl p-1.5 inline-flex items-center gap-1">
           <button
             onClick={() => setActiveTab('history')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === 'history'
-                ? 'bg-white shadow-sm text-[#EF8354]'
-                : 'text-zinc-500 hover:text-zinc-700'
-            }`}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'history'
+              ? 'bg-white shadow-sm text-[#EF8354]'
+              : 'text-zinc-500 hover:text-zinc-700'
+              }`}
           >
             <div className="flex items-center gap-2">
               <Clock size={14} />
@@ -251,11 +266,10 @@ export default function UsagePage() {
           </button>
           <button
             onClick={() => setActiveTab('daily')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              activeTab === 'daily'
-                ? 'bg-white shadow-sm text-[#EF8354]'
-                : 'text-zinc-500 hover:text-zinc-700'
-            }`}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'daily'
+              ? 'bg-white shadow-sm text-[#EF8354]'
+              : 'text-zinc-500 hover:text-zinc-700'
+              }`}
           >
             <div className="flex items-center gap-2">
               <Calendar size={14} />
@@ -323,10 +337,10 @@ export default function UsagePage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="text-sm font-mono text-zinc-600">
-                          {(record.input_text_tokens || 0) + (record.output_text_tokens || 0) || 
-                           (record.output_image_tokens || 0) || 
-                           (record.input_audio_tokens || 0) + (record.output_audio_tokens || 0) ||
-                           '-'}
+                          {(record.input_text_tokens || 0) + (record.output_text_tokens || 0) ||
+                            (record.output_image_tokens || 0) ||
+                            (record.input_audio_tokens || 0) + (record.output_audio_tokens || 0) ||
+                            '-'}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -390,7 +404,7 @@ export default function UsagePage() {
           <div className="flex-1">
             <p className="text-sm font-semibold text-blue-700 mb-1">About Usage Data</p>
             <p className="text-xs text-blue-600 leading-relaxed">
-              Usage data is fetched from Pollinations API and shows your last 100 requests (History tab) or daily summaries for the past 30 days (Daily Summary tab). 
+              Usage data is fetched from Pollinations API and shows your last 100 requests (History tab) or daily summaries for the past 30 days (Daily Summary tab).
               Data is cached for 1 hour. Export to CSV for detailed analysis.
             </p>
           </div>

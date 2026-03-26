@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutGrid, Settings, Sparkles, X, Trash2,
   Download, Clock, Search, Wand2, History as HistoryIcon,
@@ -9,15 +9,37 @@ import {
 import { toast } from 'sonner';
 import { storage, formatDate } from '@/lib/utils';
 import { HistoryItem } from '@/types';
+import { gsap } from 'gsap';
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHistory(storage.getHistory());
+  }, []);
+
+  // Page entrance animation
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      // Main content entrance
+      gsap.fromTo('.history-content',
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
+      );
+
+      // Stagger gallery grid items
+      gsap.fromTo('.history-card',
+        { opacity: 0, scale: 0.9, y: 20 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out', delay: 0.2 }
+      );
+    });
+
+    return () => ctx.revert();
   }, []);
 
   const filteredHistory = history.filter(item =>
@@ -100,7 +122,7 @@ export default function HistoryPage() {
       <div className="h-full flex flex-col md:flex-row pt-20 pb-4 px-4 md:px-6 gap-4">
 
         {/* Left: Gallery Grid */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div ref={contentRef} className="history-content flex-1 flex flex-col gap-4 min-w-0">
           <div className="glass-panel rounded-3xl p-5 flex-1 flex flex-col gap-4 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between shrink-0">
@@ -161,20 +183,20 @@ export default function HistoryPage() {
                   {filteredHistory.map(item => (
                     <div
                       key={item.id}
-                      className={`aspect-square rounded-2xl overflow-hidden cursor-pointer group relative bg-zinc-100 transition-all
+                      className={`history-card aspect-square rounded-2xl overflow-hidden cursor-pointer group relative bg-zinc-100 transition-all
                         ${selectedItem?.id === item.id ? 'ring-3 ring-[#EF8354] ring-offset-2' : 'hover:ring-2 hover:ring-[#EF8354]/40'}`}
                       onClick={() => setSelectedItem(item)}
                     >
                       <img src={item.imageUrl} alt={item.prompt} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
                         <div className="flex justify-end">
-                           <button 
-                             onClick={(e) => { e.stopPropagation(); handleDownload(item.imageUrl, item.id); }}
-                             className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#EF8354] hover:text-white transition-colors"
-                             title="Download image"
-                           >
-                             <Download size={14} />
-                           </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDownload(item.imageUrl, item.id); }}
+                            className="p-1.5 rounded-lg bg-black/40 text-white hover:bg-[#EF8354] hover:text-white transition-colors"
+                            title="Download image"
+                          >
+                            <Download size={14} />
+                          </button>
                         </div>
                         <span className="text-[10px] text-white/90 line-clamp-2 font-medium">{item.prompt}</span>
                       </div>

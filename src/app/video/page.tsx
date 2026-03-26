@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutGrid, Settings, Wand2, History, Video, Play,
   Loader2, Download, Sparkles, ChevronDown, Zap, Key,
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
 import { storage, generateId } from '@/lib/utils';
 import { HistoryItem, GenerationParams, VideoModel } from '@/types';
+import { gsap } from 'gsap';
 
 const DEFAULT_VIDEO_MODELS = [
   { value: 'wan-fast', label: 'Wan 2.2 - Fast (5s, 480p)' },
@@ -42,6 +43,21 @@ export default function VideoPage() {
   const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [rawModelData, setRawModelData] = useState<Record<string, any>>({});
+
+  // Page entrance animation
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo('.video-content',
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
+      );
+      gsap.fromTo('.video-section',
+        { opacity: 0, scale: 0.95, y: 20 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.1, ease: 'power2.out', delay: 0.2 }
+      );
+    });
+    return () => ctx.revert();
+  }, []);
 
   // Fetch video models from live API
   useEffect(() => {
@@ -197,7 +213,7 @@ export default function VideoPage() {
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
 
       {/* Main content */}
-      <div className="max-w-4xl mx-auto pt-24 px-4 pb-10 space-y-6">
+      <div className="video-content max-w-4xl mx-auto pt-24 px-4 pb-10 space-y-6">
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -229,7 +245,7 @@ export default function VideoPage() {
 
         {/* Generated Video Preview */}
         {generatedVideo && (
-          <div className="glass-panel rounded-3xl p-6 space-y-4">
+          <div className="video-section glass-panel rounded-3xl p-6 space-y-4">
             <div className="aspect-video bg-black/5 rounded-2xl overflow-hidden flex items-center justify-center">
               <video
                 src={generatedVideo}
@@ -257,7 +273,7 @@ export default function VideoPage() {
         )}
 
         {/* Generation Form */}
-        <div className="glass-panel rounded-3xl p-6 space-y-6">
+        <div className="video-section glass-panel rounded-3xl p-6 space-y-6">
 
           {/* Prompt */}
           <div className="space-y-2">

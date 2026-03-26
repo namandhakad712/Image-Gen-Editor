@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutGrid, Settings as SettingsIcon, Key, LogIn, ExternalLink,
   Eye, EyeOff, Check, Trash2, Wand2, History, Shield, Info,
@@ -13,6 +13,7 @@ import { storage } from '@/lib/utils';
 import { pollinationsAPI } from '@/lib/api';
 import { UserProfile, ApiKeyInfo, HistoryItem } from '@/types';
 import { useTheme, COLOR_PALETTE } from '@/lib/theme';
+import { gsap } from 'gsap';
 
 const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin + '/settings' : 'https://image-gen-editor.vercel.app/settings';
 const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
@@ -30,6 +31,17 @@ export default function SettingsPage() {
   const [stats, setStats] = useState({ total: 0, thisWeek: 0, pollenSpent: 0 });
 
   const { accentColor, setAccentColor } = useTheme();
+
+  // Page entrance animation
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo('.settings-card',
+        { opacity: 0, y: 30, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, ease: 'power3.out' }
+      );
+    });
+    return () => ctx.revert();
+  }, []);
 
   // Load data with caching
   const loadAllData = useCallback(async () => {
@@ -217,11 +229,11 @@ export default function SettingsPage() {
         )}
 
         {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+        <div className="settings-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
 
           {/* Profile Card - Large */}
           {hasKey && profile && (
-            <div className="lg:col-span-2 row-span-2 rounded-3xl glass-panel p-6 md:p-8 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+            <div className="settings-card lg:col-span-2 row-span-2 rounded-3xl glass-panel p-6 md:p-8 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-4">
                   <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${getTierColor(profile.tier)} flex items-center justify-center text-3xl shadow-lg`}>
@@ -281,7 +293,7 @@ export default function SettingsPage() {
           )}
 
           {/* API Key Card */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl md:col-span-1">
+          <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl md:col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
                 <Key size={18} />
@@ -339,7 +351,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+          <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#EF8354] to-orange-500 flex items-center justify-center text-white shadow-lg">
                 <Sparkles size={18} />
@@ -379,7 +391,7 @@ export default function SettingsPage() {
           </div>
 
           {/* BYOP Connect */}
-          <div className="md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-[#EF8354]/10 to-orange-100/50 border border-[#EF8354]/20 shadow-xl">
+          <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-[#EF8354]/10 to-orange-100/50 border border-[#EF8354]/20 shadow-xl">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center text-[#EF8354] shadow-lg">
@@ -407,7 +419,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Theme Color Picker */}
-          <div className="md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+          <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-lg">
@@ -474,7 +486,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Recent Images */}
-          <div className="md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+          <div className="settings-card md:col-span-2 lg:col-span-2 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
@@ -508,7 +520,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Info Cards */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+          <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white shadow-lg">
                 <Shield size={18} />
@@ -535,7 +547,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Links */}
-          <div className="rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
+          <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-white/80 border border-white/30 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-600 to-zinc-700 flex items-center justify-center text-white shadow-lg">
                 <Globe size={18} />

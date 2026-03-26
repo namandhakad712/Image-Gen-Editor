@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
 import { storage, generateId } from '@/lib/utils';
 import { HistoryItem } from '@/types';
+import { gsap } from 'gsap';
 
 const DEFAULT_MODELS = [
   { value: 'flux', label: 'Flux Schnell' },
@@ -30,11 +31,26 @@ export default function EditPage() {
   const [models, setModels] = useState(DEFAULT_MODELS);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Page entrance animation
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo('.edit-content',
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' }
+      );
+      gsap.fromTo('.edit-section',
+        { opacity: 0, scale: 0.95, y: 20 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.4, stagger: 0.1, ease: 'power2.out', delay: 0.2 }
+      );
+    });
+    return () => ctx.revert();
+  }, []);
+
   useEffect(() => {
     fetch('https://image.pollinations.ai/models')
       .then(res => res.json())
       .then((data: any[]) => {
-        const imageModels = data.filter(m => m.type === 'image' || 
+        const imageModels = data.filter(m => m.type === 'image' ||
           (m.output_modalities && (m.output_modalities.includes('image') || m.output_modalities.includes('video')))
         );
         if (imageModels.length > 0) {
@@ -166,7 +182,7 @@ export default function EditPage() {
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />}
 
       {/* Main content */}
-      <div className="max-w-5xl mx-auto pt-24 px-4 pb-10 space-y-6">
+      <div className="edit-content max-w-5xl mx-auto pt-24 px-4 pb-10 space-y-6">
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -180,7 +196,7 @@ export default function EditPage() {
         </div>
 
         {/* Image comparison */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="edit-section grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Source */}
           <div className="glass-panel rounded-3xl p-5 space-y-3">
             <div className="flex items-center justify-between">
@@ -234,7 +250,7 @@ export default function EditPage() {
         </div>
 
         {/* Edit controls */}
-        <div className="glass-panel rounded-3xl p-5 space-y-4">
+        <div className="edit-section glass-panel rounded-3xl p-5 space-y-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <textarea

@@ -18,6 +18,8 @@ import { generateRandomPrompt, getRandomAppend, processPromptVariables } from '@
 import { useTheme } from '@/lib/theme';
 import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS, API_HELPERS } from '@/lib/apiConfig';
 import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
+import { gsap } from 'gsap';
+import { animateEntrance, animateModalOpen, animateButtonClick, animateToastIn } from '@/lib/gsapAnimations';
 
 // No GSAP plugins needed - using native pointer events for better performance
 
@@ -192,10 +194,60 @@ export default function SpatialImageEditor() {
   const [transparent, setTransparent] = useState(false);
 
   // Refs
-  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+
+  // GSAP page entrance animation
+  useEffect(() => {
+    // Animate page elements on mount
+    const ctx = gsap.context(() => {
+      // Main container entrance
+      gsap.fromTo('.page-container',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, ease: 'power2.out' }
+      );
+
+      // Staggered menu items
+      gsap.fromTo('.menu-item',
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.3, stagger: 0.05, delay: 0.2, ease: 'power2.out' }
+      );
+
+      // Sidebar panel entrance
+      gsap.fromTo('.sidebar-panel',
+        { opacity: 0, x: -30 },
+        { opacity: 1, x: 0, duration: 0.5, delay: 0.3, ease: 'power3.out' }
+      );
+
+      // Bottom panel entrance
+      gsap.fromTo('.bottom-panel',
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.5, delay: 0.4, ease: 'power3.out' }
+      );
+    });
+
+    return () => ctx.revert();
+  }, []);
+
+  // Button click animation handler
+  const handleButtonClick = useCallback((e: React.MouseEvent, callback: () => void) => {
+    const target = e.currentTarget as HTMLElement;
+    gsap.to(target, {
+      scale: 0.94,
+      duration: 0.1,
+      ease: 'power2.out',
+      onComplete: () => {
+        gsap.to(target, {
+          scale: 1,
+          duration: 0.15,
+          ease: 'elastic.out(1, 0.5)'
+        });
+        callback();
+      }
+    });
+  }, []);
+
   // =============================================
   useEffect(() => {
     // Fetch from centralized API config
@@ -850,10 +902,11 @@ export default function SpatialImageEditor() {
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
-  // Clear canvas (remove all images from view but keep in localStorage)
+  // Clear canvas (remove all images from canvas AND localStorage)
   const clearCanvas = () => {
     setCanvasImages([]);
     setSelectedImageId(null);
+    localStorage.removeItem('pollinations_canvas_images');
     toast.success('Canvas cleared. Images are saved in history.');
   };
 
@@ -967,7 +1020,7 @@ export default function SpatialImageEditor() {
   //  RENDER
   // =============================================
   return (
-    <div className="w-full h-[100dvh] relative overflow-hidden">
+    <div className="page-container w-full h-[100dvh] relative overflow-hidden">
 
       {/* =========================================
           INFINITE CANVAS (full viewport)
@@ -1240,7 +1293,7 @@ export default function SpatialImageEditor() {
         <div className="fixed inset-0 bg-black/10 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed top-20 bottom-56 md:top-24 md:bottom-40 left-4 md:left-6 w-[300px] md:w-[340px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
+      <aside className={`sidebar-panel fixed top-20 bottom-56 md:top-24 md:bottom-40 left-4 md:left-6 w-[300px] md:w-[340px] glass-panel rounded-[28px] p-5 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:-translate-x-[120%]'}`}>
 
         {/* Close button for mobile */}
@@ -1543,196 +1596,204 @@ export default function SpatialImageEditor() {
       </div>
 
       {/* Custom Style Modal */}
-      {showStyleModal && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowStyleModal(false)}>
-          <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-md bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-zinc-800">Add Custom Style</h3>
-              <button onClick={() => setShowStyleModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={18} />
+      {
+        showStyleModal && (
+          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowStyleModal(false)}>
+            <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-md bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-zinc-800">Add Custom Style</h3>
+                <button onClick={() => setShowStyleModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                  <X size={18} />
+                </button>
+              </div>
+              <textarea
+                value={customStyle}
+                onChange={e => setCustomStyle(e.target.value)}
+                placeholder="Enter style keywords, e.g., 'cyberpunk, neon lights, futuristic city'..."
+                className="w-full h-32 p-4 rounded-2xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none mb-4"
+                autoFocus
+              />
+              <button
+                onClick={handleAddCustomStyle}
+                disabled={!customStyle.trim()}
+                className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all shadow-lg"
+              >
+                Add to Prompt
               </button>
             </div>
-            <textarea
-              value={customStyle}
-              onChange={e => setCustomStyle(e.target.value)}
-              placeholder="Enter style keywords, e.g., 'cyberpunk, neon lights, futuristic city'..."
-              className="w-full h-32 p-4 rounded-2xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none mb-4"
-              autoFocus
-            />
-            <button
-              onClick={handleAddCustomStyle}
-              disabled={!customStyle.trim()}
-              className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] disabled:bg-zinc-300 disabled:cursor-not-allowed transition-all shadow-lg"
-            >
-              Add to Prompt
-            </button>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Image Comparison Modal */}
-      {comparisonImages && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-md" onClick={() => setComparisonImages(null)}>
-          <div className="glass-panel rounded-3xl p-6 w-full max-w-4xl bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-zinc-800 flex items-center gap-2">
-                <ArrowRightLeft size={20} />
-                Compare Images
-              </h3>
-              <button onClick={() => setComparisonImages(null)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={20} />
-              </button>
-            </div>
+      {
+        comparisonImages && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-md" onClick={() => setComparisonImages(null)}>
+            <div className="glass-panel rounded-3xl p-6 w-full max-w-4xl bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-zinc-800 flex items-center gap-2">
+                  <ArrowRightLeft size={20} />
+                  Compare Images
+                </h3>
+                <button onClick={() => setComparisonImages(null)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                  <X size={20} />
+                </button>
+              </div>
 
-            {/* Comparison Slider */}
-            <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-100">
-              <ComparisonSlider leftImage={comparisonImages.left} rightImage={comparisonImages.right} />
-            </div>
+              {/* Comparison Slider */}
+              <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-100">
+                <ComparisonSlider leftImage={comparisonImages.left} rightImage={comparisonImages.right} />
+              </div>
 
-            <div className="flex items-center justify-center gap-4 mt-6">
-              <button
-                onClick={() => setComparisonImages(null)}
-                className="px-6 py-3 rounded-xl font-semibold text-sm border border-zinc-200 hover:bg-zinc-50 transition-all"
-              >
-                Close
-              </button>
+              <div className="flex items-center justify-center gap-4 mt-6">
+                <button
+                  onClick={() => setComparisonImages(null)}
+                  className="px-6 py-3 rounded-xl font-semibold text-sm border border-zinc-200 hover:bg-zinc-50 transition-all"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Style Selector Modal */}
-      {showStyleSelector && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowStyleSelector(false)}>
-          <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-2xl bg-white/90 backdrop-blur-xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <h3 className="text-xl font-bold text-zinc-800">Select Art Style</h3>
-              <button onClick={() => setShowStyleSelector(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={20} />
-              </button>
-            </div>
+      {
+        showStyleSelector && (
+          <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowStyleSelector(false)}>
+            <div className="glass-panel rounded-t-3xl md:rounded-3xl p-6 w-full max-w-2xl bg-white/90 backdrop-blur-xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <h3 className="text-xl font-bold text-zinc-800">Select Art Style</h3>
+                <button onClick={() => setShowStyleSelector(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                  <X size={20} />
+                </button>
+              </div>
 
-            {/* Add Custom Style Button */}
-            <button
-              onClick={() => { setShowCustomStyleModal(true); setShowStyleSelector(false); }}
-              className="mb-4 p-3 rounded-xl border-2 border-dashed border-zinc-300 hover:border-[#EF8354]/50 hover:bg-[#EF8354]/5 transition-all flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 hover:text-[#EF8354]"
-            >
-              <Plus size={16} />
-              Create Custom Style
-            </button>
+              {/* Add Custom Style Button */}
+              <button
+                onClick={() => { setShowCustomStyleModal(true); setShowStyleSelector(false); }}
+                className="mb-4 p-3 rounded-xl border-2 border-dashed border-zinc-300 hover:border-[#EF8354]/50 hover:bg-[#EF8354]/5 transition-all flex items-center justify-center gap-2 text-sm font-semibold text-zinc-500 hover:text-[#EF8354]"
+              >
+                <Plus size={16} />
+                Create Custom Style
+              </button>
 
-            {/* Category Filter */}
-            <div className="flex gap-2 overflow-x-auto pb-3 mb-2 shrink-0">
-              <button
-                onClick={() => setStyleCategory('All')}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                  }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setStyleCategory('Custom')}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'Custom' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                  }`}
-              >
-                Custom
-              </button>
-              {STYLE_CATEGORIES.map(cat => (
+              {/* Category Filter */}
+              <div className="flex gap-2 overflow-x-auto pb-3 mb-2 shrink-0">
                 <button
-                  key={cat}
-                  onClick={() => setStyleCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === cat ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  onClick={() => setStyleCategory('All')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                     }`}
                 >
-                  {cat}
+                  All
                 </button>
-              ))}
-            </div>
-
-            {/* Styles Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto flex-1 custom-scrollbar">
-              {/* Custom Styles */}
-              {styleCategory === 'Custom' && customStyles.map(style => (
-                <div
-                  key={style.id}
-                  className="relative p-4 rounded-2xl border-2 border-zinc-200 bg-white text-left transition-all hover:shadow-lg group"
+                <button
+                  onClick={() => setStyleCategory('Custom')}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'Custom' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    }`}
                 >
+                  Custom
+                </button>
+                {STYLE_CATEGORIES.map(cat => (
                   <button
-                    onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
-                    className="absolute inset-0 w-full h-full"
-                  />
-                  <div className="text-sm font-bold text-zinc-800 mb-1">{style.label}</div>
-                  <div className="text-[10px] text-zinc-400 truncate">{style.prompt}</div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteCustomStyle(style.id); }}
-                    className="absolute top-2 right-2 p-1 rounded-full bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                    key={cat}
+                    onClick={() => setStyleCategory(cat)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === cat ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                      }`}
                   >
-                    <Trash2 size={12} />
+                    {cat}
                   </button>
-                </div>
-              ))}
+                ))}
+              </div>
 
-              {/* Built-in Styles */}
-              {styleCategory !== 'Custom' && ART_STYLES.filter(s => styleCategory === 'All' || s.category === styleCategory).map(style => (
-                <button
-                  key={style.id}
-                  onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${selectedStyle.id === style.id
-                    ? 'border-[#EF8354] bg-[#EF8354]/5'
-                    : 'border-zinc-200 bg-white hover:border-[#EF8354]/50'
-                    }`}
-                >
-                  <div className="text-lg mb-1">{style.label}</div>
-                  <div className="text-[10px] text-zinc-400 truncate">{style.prompt || 'No style modifiers'}</div>
-                </button>
-              ))}
+              {/* Styles Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto flex-1 custom-scrollbar">
+                {/* Custom Styles */}
+                {styleCategory === 'Custom' && customStyles.map(style => (
+                  <div
+                    key={style.id}
+                    className="relative p-4 rounded-2xl border-2 border-zinc-200 bg-white text-left transition-all hover:shadow-lg group"
+                  >
+                    <button
+                      onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
+                      className="absolute inset-0 w-full h-full"
+                    />
+                    <div className="text-sm font-bold text-zinc-800 mb-1">{style.label}</div>
+                    <div className="text-[10px] text-zinc-400 truncate">{style.prompt}</div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteCustomStyle(style.id); }}
+                      className="absolute top-2 right-2 p-1 rounded-full bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Built-in Styles */}
+                {styleCategory !== 'Custom' && ART_STYLES.filter(s => styleCategory === 'All' || s.category === styleCategory).map(style => (
+                  <button
+                    key={style.id}
+                    onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
+                    className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${selectedStyle.id === style.id
+                      ? 'border-[#EF8354] bg-[#EF8354]/5'
+                      : 'border-zinc-200 bg-white hover:border-[#EF8354]/50'
+                      }`}
+                  >
+                    <div className="text-lg mb-1">{style.label}</div>
+                    <div className="text-[10px] text-zinc-400 truncate">{style.prompt || 'No style modifiers'}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Custom Style Creation Modal */}
-      {showCustomStyleModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowCustomStyleModal(false)}>
-          <div className="glass-panel rounded-3xl p-6 w-full max-w-md bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-zinc-800">Create Custom Style</h3>
-              <button onClick={() => setShowCustomStyleModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-600 mb-1 block">Style Name</label>
-                <input
-                  type="text"
-                  value={customStyleName}
-                  onChange={e => setCustomStyleName(e.target.value)}
-                  placeholder="e.g., My Cyberpunk Style"
-                  className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
-                />
+      {
+        showCustomStyleModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm" onClick={() => setShowCustomStyleModal(false)}>
+            <div className="glass-panel rounded-3xl p-6 w-full max-w-md bg-white/90 backdrop-blur-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-zinc-800">Create Custom Style</h3>
+                <button onClick={() => setShowCustomStyleModal(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+                  <X size={18} />
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-zinc-600 mb-1 block">Style Prompt</label>
-                <textarea
-                  value={customStylePrompt}
-                  onChange={e => setCustomStylePrompt(e.target.value)}
-                  placeholder="e.g., cyberpunk, neon lights, futuristic city, rain-soaked streets..."
-                  className="w-full h-32 p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 mb-1 block">Style Name</label>
+                  <input
+                    type="text"
+                    value={customStyleName}
+                    onChange={e => setCustomStyleName(e.target.value)}
+                    placeholder="e.g., My Cyberpunk Style"
+                    className="w-full p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-zinc-600 mb-1 block">Style Prompt</label>
+                  <textarea
+                    value={customStylePrompt}
+                    onChange={e => setCustomStylePrompt(e.target.value)}
+                    placeholder="e.g., cyberpunk, neon lights, futuristic city, rain-soaked streets..."
+                    className="w-full h-32 p-3 rounded-xl bg-zinc-100 border border-zinc-200 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 resize-none"
+                  />
+                </div>
+                <button
+                  onClick={handleSaveCustomStyle}
+                  className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg"
+                >
+                  Save Custom Style
+                </button>
               </div>
-              <button
-                onClick={handleSaveCustomStyle}
-                className="w-full py-3.5 rounded-xl font-bold text-sm text-white bg-[#EF8354] hover:bg-[#e27344] transition-all shadow-lg"
-              >
-                Save Custom Style
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-    </div>
+    </div >
   );
 }
 
