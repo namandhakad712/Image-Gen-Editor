@@ -21,79 +21,19 @@
 
 ## 🌟 What is Image Gen Editor Pro?
 
-> **An open-source, AI-powered image generation and editing platform** built with Next.js 14, TypeScript, and Tailwind CSS. Create stunning visuals from text prompts, edit existing images with AI, and explore your creativity — **completely free** with Pollinations AI.
+> **A production-ready, AI-powered image generation and editing platform** built with Next.js 14, TypeScript, and Tailwind CSS. Create stunning visuals from text prompts, edit existing images with AI, and explore your creativity — **completely free** with Pollinations AI.
 
-<div align="center">
+### ✨ Key Features
 
-### 🎯 **Open Source Initiative**
-
-**This project is 100% open source!** We believe in democratizing AI tools and making them accessible to everyone.
-
-[![GitHub Repo stars](https://img.shields.io/github/stars/namandhakad712/Image-Gen-Editor?style=social)](https://github.com/namandhakad712/Image-Gen-Editor/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/namandhakad712/Image-Gen-Editor?style=social)](https://github.com/namandhakad712/Image-Gen-Editor/network)
-[![GitHub issues](https://img.shields.io/github/issues/namandhakad712/Image-Gen-Editor)](https://github.com/namandhakad712/Image-Gen-Editor/issues)
-[![GitHub contributors](https://img.shields.io/github/contributors/namandhakad712/Image-Gen-Editor)](https://github.com/namandhakad712/Image-Gen-Editor/graphs/contributors)
-
-**🚀 Contribute Now:** [github.com/namandhakad712/Image-Gen-Editor](https://github.com/namandhakad712/Image-Gen-Editor)
-
-</div>
-
----
-
-## ✨ Features
-
-<div align="center">
-
-<table>
-  <tr>
-    <td align="center" width="33%">
-      <img src="https://img.icons8.com/fluency/96/artificial-intelligence.png" alt="AI Generation" width="64"/>
-      <br/>
-      <b>🖼️ AI Image Generation</b>
-      <br/>
-      <small>38+ AI models • Text-to-image • Style presets</small>
-    </td>
-    <td align="center" width="33%">
-      <img src="https://img.icons8.com/fluency/96/video-editing.png" alt="Video Generation" width="64"/>
-      <br/>
-      <b>🎬 Video Generation</b>
-      <br/>
-      <small>Text-to-video • Multiple models • HD quality</small>
-    </td>
-    <td align="center" width="33%">
-      <img src="https://img.icons8.com/fluency/96/edit-image.png" alt="Image Editing" width="64"/>
-      <br/>
-      <b>✏️ AI Image Editing</b>
-      <br/>
-      <small>Reference images • AI transforms • Edit endpoint</small>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="33%">
-      <img src="https://img.icons8.com/fluency/96/paint-palette.png" alt="Custom Themes" width="64"/>
-      <br/>
-      <b>🎨 Custom Themes</b>
-      <br/>
-      <small>Color picker • Personalize accent • 100+ colors</small>
-    </td>
-    <td align="center" width="33%">
-      <img src="https://img.icons8.com/fluency/96/paper.png" alt="History" width="64"/>
-      <br/>
-      <b>📚 Generation History</b>
-      <br/>
-      <small>Local storage • Gallery view • Download & share</small>
-    </td>
-    <td align="center" width="33%">
-      <img src="https://img.icons8.com/fluency/96/settings.png" alt="Settings" width="64"/>
-      <br/>
-      <b>⚙️ Advanced Settings</b>
-      <br/>
-      <small>API management • Model selection • Preferences</small>
-    </td>
-  </tr>
-</table>
-
-</div>
+- **🖼️ AI Image Generation** - 18+ AI models including Flux, GPT Image, NanoBanana, Seedream
+- **🎬 Video Generation** - Text-to-video with Veo, Seedance, Wan models
+- **✏️ AI Image Editing** - Edit images using reference images + prompts
+- **🎨 Infinite Canvas** - Pan, zoom, and arrange multiple generated images
+- **🔧 Advanced Controls** - Style strength, guidance scale, steps, negative prompts
+- **📚 History Management** - LocalStorage-based generation history
+- **🎯 Batch Generation** - Generate up to 10 images at once
+- **🌈 Custom Themes** - 100+ accent colors
+- **🔐 BYOP Integration** - Let users pay for their own API usage
 
 ---
 
@@ -101,10 +41,17 @@
 
 ### Prerequisites
 
+Ensure you have the following installed:
+
+- **Node.js** 18+ ([Download](https://nodejs.org))
+- **npm** or **yarn**
+- **Git** ([Download](https://git-scm.com))
+
+Verify installations:
 ```bash
-✅ Node.js 18+
-✅ npm or yarn
-✅ Git
+node --version  # Should be v18 or higher
+npm --version
+git --version
 ```
 
 ### Installation
@@ -112,18 +59,42 @@
 ```bash
 # 📥 Clone the repository
 git clone https://github.com/namandhakad712/Image-Gen-Editor.git
-cd Image-Gen-Editor
+cd Image-Gen-Editor/pollinations-app
 
 # 📦 Install dependencies
 npm install
+
+# 📝 Copy environment variables
+cp .env.example .env.local
 
 # 🏃 Start development server
 npm run dev
 ```
 
-Open **[http://localhost:3000](http://localhost:3000)** and start creating! 🎉
+The app will open at **[http://localhost:3000](http://localhost:3000)** 🎉
 
-### Get Your Free API Key
+### Environment Variables
+
+Copy `.env.example` to `.env.local` and configure:
+
+```bash
+# Required: Pollinations API (default works without changes)
+NEXT_PUBLIC_POLLINATIONS_API_URL=https://gen.pollinations.ai
+NEXT_PUBLIC_POLLINATIONS_MEDIA_URL=https://media.pollinations.ai
+
+# Optional: Enable debug logging
+NEXT_PUBLIC_DEBUG_MODE=false
+
+# Optional: Rate limiting (requests per minute)
+NEXT_PUBLIC_RATE_LIMIT_REQUESTS=60
+
+# Optional: Cache TTL in milliseconds
+NEXT_PUBLIC_CACHE_TTL=300000
+```
+
+---
+
+## 🔑 Get Your Free API Key
 
 1. Visit [enter.pollinations.ai](https://enter.pollinations.ai)
 2. Create a free account (GitHub sign-in available)
@@ -132,25 +103,36 @@ Open **[http://localhost:3000](http://localhost:3000)** and start creating! 🎉
 
 > 💡 **Free tier includes hourly pollen refills!** No credit card required.
 
+### API Key Types
+
+| Type | Prefix | Use Case | Rate Limits |
+|------|--------|----------|-------------|
+| **Secret** | `sk_` | Server-side only | None |
+| **Publishable** | `pk_` | Client-side apps | 1 pollen/IP/hour |
+
+⚠️ **Never expose secret keys in client-side code!**
+
 ---
 
 ## 🛠️ Tech Stack
 
-<div align="center">
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Framework | Next.js 14 (App Router) | 14.2.3 |
+| Language | TypeScript | 5.4.5 |
+| Styling | Tailwind CSS | 3.4.3 |
+| Icons | Lucide React | 0.378.0 |
+| Notifications | Sonner | 1.4.41 |
+| Analytics | Vercel Analytics | 2.0.1 |
+| Deployment | Vercel | - |
+| AI Backend | Pollinations AI API | - |
 
-```
-╔═══════════════════════════════════════════════════════════╗
-║  🖼️  Framework      │ Next.js 14 (App Router)            ║
-║  💻  Language       │ TypeScript 5                       ║
-║  🎨  Styling        │ Tailwind CSS 3                     ║
-║  ✨  Icons          │ Lucide React                       ║
-║  🔔  Notifications  │ Sonner                             ║
-║  ☁️  Deployment     │ Vercel                             ║
-║  🤖  AI Backend     │ Pollinations AI API                ║
-╚═══════════════════════════════════════════════════════════╝
-```
+### Development Tools
 
-</div>
+- **ESLint** - Code linting
+- **Prettier** - Code formatting (via ESLint)
+- **PostCSS** - CSS processing
+- **Autoprefixer** - CSS vendor prefixes
 
 ---
 
@@ -160,30 +142,57 @@ Open **[http://localhost:3000](http://localhost:3000)** and start creating! 🎉
 pollinations-app/
 ├── 📂 src/
 │   ├── 📂 app/                    # Next.js App Router
-│   │   ├── 📄 layout.tsx          # Root layout
-│   │   ├── 📄 page.tsx            # Home (Generate)
+│   │   ├── 📄 layout.tsx          # Root layout + SEO + Providers
+│   │   ├── 📄 page.tsx            # Home - Infinite canvas generator
+│   │   ├── 📄 Providers.tsx       # App providers wrapper
 │   │   ├── 📂 gallery/            # Community gallery
 │   │   ├── 📂 history/            # Generation history
 │   │   ├── 📂 settings/           # API configuration
 │   │   ├── 📂 usage/              # Usage dashboard
 │   │   └── 📂 video/              # Video generation
 │   ├── 📂 components/             # Reusable UI components
+│   │   └── 📄 ErrorBoundary.tsx   # Error boundary component
 │   ├── 📂 lib/                    # Utilities & API
-│   │   ├── 📄 api.ts              # Pollinations API client
+│   │   ├── 📄 api.ts              # PollinationsAPI client (with retry/rate-limit)
+│   │   ├── 📄 env.ts              # Environment configuration
 │   │   ├── 📄 styles.ts           # Art styles library
 │   │   ├── 📄 prompts.ts          # Prompt templates
+│   │   ├── 📄 theme.tsx           # Theme customization
 │   │   └── 📄 utils.ts            # Helper functions
 │   └── 📂 types/                  # TypeScript definitions
+│       └── 📄 index.ts            # Type definitions
 ├── 📂 public/                     # Static assets
-├── 📄 vercel.json                 # Vercel configuration
+├── 📄 .env.example                # Environment variables template
+├── 📄 next.config.mjs             # Next.js configuration
+├── 📄 tailwind.config.ts          # Tailwind CSS configuration
+├── 📄 tsconfig.json               # TypeScript configuration
+├── 📄 vercel.json                 # Vercel deployment config
 └── 📄 package.json
 ```
 
 ---
 
-## 🎨 Custom Theme Color
+## 📖 Available Scripts
 
-<div align="center">
+```bash
+# Development
+npm run dev          # Start development server (http://localhost:3000)
+
+# Production
+npm run build        # Build for production
+npm start            # Start production server
+
+# Code Quality
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix ESLint errors automatically
+
+# Type Checking
+npx tsc --noEmit     # Check TypeScript types
+```
+
+---
+
+## 🎨 Custom Theme Color
 
 ### Personalize Your Experience!
 
@@ -197,15 +206,13 @@ Choose your favorite accent color from **100+ colors** in the Settings panel. Yo
 - 🔴 **Ruby Red** `#EF4444`
 - 🌸 **Sakura Pink** `#EC4899`
 
-</div>
-
 ---
 
 ## 🚀 Deploy to Vercel
 
 <div align="center">
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/namandhakad712/Image-Gen-Editor)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/namandhakad712/Image-Gen-Editor/tree/main/pollinations-app)
 
 </div>
 
@@ -213,7 +220,7 @@ Choose your favorite accent color from **100+ colors** in the Settings panel. Yo
 
 1. Click the **Deploy** button above
 2. Connect your GitHub account
-3. Configure environment variables (optional)
+3. Configure environment variables
 4. Deploy! ✨
 
 ### Manual Deploy
@@ -229,9 +236,24 @@ vercel
 vercel --prod
 ```
 
+### Deploy to Other Platforms
+
+#### Netlify
+```bash
+npm run build
+# Connect to Netlify and set build command: npm run build
+# Publish directory: .next (for Next.js) or out (for static export)
+```
+
+#### Docker
+```bash
+docker build -t image-gen-editor .
+docker run -p 3000:3000 image-gen-editor
+```
+
 ---
 
-## 📖 API Reference
+## 📡 API Reference
 
 ### Generate Image
 
@@ -240,7 +262,7 @@ POST https://gen.pollinations.ai/v1/images/generations
 
 {
   "prompt": "A beautiful sunset over mountains",
-  "model": "flux-schnell",
+  "model": "flux",
   "n": 1,
   "size": "1024x1024",
   "response_format": "url"
@@ -254,9 +276,8 @@ POST https://gen.pollinations.ai/v1/images/edits
 
 {
   "prompt": "Add a rainbow in the sky",
-  "image": "base64_encoded_image",
-  "strength": 0.7,
-  "model": "flux-edit"
+  "image": "base64_encoded_image_or_url",
+  "model": "flux"
 }
 ```
 
@@ -264,6 +285,51 @@ POST https://gen.pollinations.ai/v1/images/edits
 
 ```typescript
 GET https://gen.pollinations.ai/video/{prompt}?model=veo&duration=5
+```
+
+### Available Models
+
+**Image Models (18+):**
+- `flux` - Flux Schnell (fast, free)
+- `zimage` - Z-Image Turbo
+- `gptimage` - GPT Image 1 Mini
+- `gptimage-large` - GPT Image 1.5
+- `nanobanana` - NanoBanana (Gemini)
+- `nanobanana-pro` - NanoBanana Pro
+- `seedream5` - Seedream 5.0 Lite
+- `kontext` - FLUX.1 Kontext
+- `klein` - FLUX.2 Klein 4B
+- And more...
+
+**Video Models:**
+- `veo` - Veo 3.1 Fast
+- `seedance` - Seedance Lite
+- `wan` - Wan 2.6
+- `ltx-2` - LTX-2
+
+---
+
+## 🧪 Testing
+
+### Manual Testing Checklist
+
+- [ ] Image generation with different models
+- [ ] Image editing with reference images
+- [ ] Video generation
+- [ ] Batch generation
+- [ ] History management
+- [ ] Theme customization
+- [ ] API key management
+- [ ] BYOP OAuth flow
+- [ ] Mobile responsiveness
+- [ ] Error handling
+
+### Automated Testing (Coming Soon)
+
+```bash
+npm run test          # Run tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report
 ```
 
 ---
@@ -296,23 +362,42 @@ This is an **open-source community project**. Whether you're fixing bugs, adding
 - 🌍 Translations
 - 🧪 Tests
 
+#### Development Guidelines
+
+1. **Code Style**: Follow existing conventions (ESLint rules)
+2. **TypeScript**: Use strict typing
+3. **Components**: Functional components with hooks
+4. **Testing**: Add tests for new features
+5. **Documentation**: Update docs for changes
+
 ---
 
 ## 📄 License
 
 This project is licensed under the **[MIT License](LICENSE)** — feel free to use it for personal and commercial projects!
 
+```
+MIT License
+
+Copyright (c) 2024 Image Gen Editor
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software...
+```
+
 ---
 
 ## 🔗 Links
 
-<div align="center">
-
-| [🌐 Live Demo](https://image-gen-editor.vercel.app) | [📚 API Docs](https://gen.pollinations.ai) | [🔑 Get API Key](https://enter.pollinations.ai) |
-|-----------------------------------------------------|-------------------------------------------|------------------------------------------------|
-| [🐛 Report Bug](https://github.com/namandhakad712/Image-Gen-Editor/issues) | [💡 Request Feature](https://github.com/namandhakad712/Image-Gen-Editor/issues) | [👥 Contributors](https://github.com/namandhakad712/Image-Gen-Editor/graphs/contributors) |
-
-</div>
+| Resource | URL |
+|----------|-----|
+| **Live Demo** | [image-gen-editor.vercel.app](https://image-gen-editor.vercel.app) |
+| **API Docs** | [gen.pollinations.ai](https://gen.pollinations.ai) |
+| **Get API Key** | [enter.pollinations.ai](https://enter.pollinations.ai) |
+| **GitHub Issues** | [github.com/namandhakad712/Image-Gen-Editor/issues](https://github.com/namandhakad712/Image-Gen-Editor/issues) |
 
 ---
 
@@ -327,6 +412,13 @@ This project is licensed under the **[MIT License](LICENSE)** — feel free to u
 - 📚 **Docs:** [Pollinations API](https://gen.pollinations.ai)
 
 </div>
+
+---
+
+## 🏆 Contributors
+
+<!-- Use GitHub API to fetch contributors dynamically -->
+[![Contributors](https://contrib.rocks/image?repo=namandhakad712/Image-Gen-Editor)](https://github.com/namandhakad712/Image-Gen-Editor/graphs/contributors)
 
 ---
 

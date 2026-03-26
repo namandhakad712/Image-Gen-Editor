@@ -3,13 +3,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   LayoutGrid, Settings, Upload, Wand2, History,
-  Sparkles, Loader2, ImagePlus, Trash2, Download, X,
-  RotateCcw, ChevronDown, Video, BarChart3
+  Sparkles, Loader2, ImagePlus, Trash2, Download,
+  ChevronDown, Video, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
 import { storage, generateId } from '@/lib/utils';
-import { HistoryItem, GenerationParams } from '@/types';
+import { HistoryItem } from '@/types';
 
 const DEFAULT_MODELS = [
   { value: 'flux', label: 'Flux Schnell' },

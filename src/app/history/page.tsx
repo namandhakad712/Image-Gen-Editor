@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   LayoutGrid, Settings, Sparkles, X, Trash2,
-  Download, ArrowLeft, Clock, Image, Search, Wand2, History as HistoryIcon,
-  ChevronRight, Menu, ImagePlus, Video, BarChart3
+  Download, Clock, Search, Wand2, History as HistoryIcon,
+  Video, BarChart3
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { storage, formatDate } from '@/lib/utils';

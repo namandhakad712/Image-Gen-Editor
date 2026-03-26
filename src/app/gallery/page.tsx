@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   LayoutGrid, Settings, Wand2, History, Video, BarChart3,
-  Sparkles, Download, ExternalLink, RefreshCw, Search, Filter,
-  Images, Eye, Copy, Check
+  Download, ExternalLink, RefreshCw, Search,
+  Images, Copy, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 

@@ -1,93 +1,332 @@
 import { ImageModel, TextModel, GenerationParams, ApiError, VideoModel, AudioModel, UserProfile, UsageRecord, DailyUsageRecord, ApiKeyInfo } from '@/types';
+import { env } from './env';
 
-const BASE_URL = 'https://gen.pollinations.ai';
+const BASE_URL = env.apiUrl;
+const MEDIA_URL = env.mediaUrl;
+const DEBUG = env.debugMode;
 
+// Rate limiting state
+let requestQueue: Array<() => Promise<void>> = [];
+let isProcessingQueue = false;
+const RATE_LIMIT_REQUESTS = env.rateLimitRequests;
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const requestTimestamps: number[] = [];
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+const RETRY_BACKOFF = 2; // exponential backoff multiplier
+
+// Request timeout
+const REQUEST_TIMEOUT = 120000; // 2 minutes
+
+/**
+ * Logger utility for consistent debug logging
+ */
+const logger = {
+  debug: (...args: unknown[]) => DEBUG && console.debug('[API]', ...args),
+  info: (...args: unknown[]) => DEBUG && console.info('[API]', ...args),
+  warn: (...args: unknown[]) => console.warn('[API]', ...args),
+  error: (...args: unknown[]) => console.error('[API]', ...args),
+};
+
+/**
+ * Sleep utility for retry delays
+ */
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Rate limiter using token bucket algorithm
+ */
+async function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  
+  // Remove old timestamps outside the window
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW) {
+    requestTimestamps.shift();
+  }
+  
+  // If at rate limit, wait until oldest request expires
+  if (requestTimestamps.length >= RATE_LIMIT_REQUESTS) {
+    const waitTime = (requestTimestamps[0] + RATE_LIMIT_WINDOW) - now;
+    if (waitTime > 0) {
+      logger.debug('Rate limit reached, waiting', waitTime, 'ms');
+      await sleep(waitTime);
+      return withRateLimit(fn); // Retry after waiting
+    }
+  }
+  
+  // Record this request
+  requestTimestamps.push(now);
+  
+  try {
+    return await fn();
+  } catch (error) {
+    // Remove timestamp if request failed (don't count failed requests)
+    requestTimestamps.pop();
+    throw error;
+  }
+}
+
+/**
+ * Retry wrapper with exponential backoff
+ */
+async function withRetry<T>(fn: () => Promise<T>, operationName: string): Promise<T> {
+  let lastError: unknown;
+  
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry on client errors (4xx) except 429
+      if (error instanceof ApiErrorImpl && error.status >= 400 && error.status < 500 && error.status !== 429) {
+        throw error;
+      }
+      
+      if (attempt < MAX_RETRIES) {
+        const delay = RETRY_DELAY * Math.pow(RETRY_BACKOFF, attempt);
+        logger.warn(`${operationName} failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * Fetch with timeout
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout = REQUEST_TIMEOUT
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Custom API Error class for better error handling
+ */
+class ApiErrorImpl extends Error implements ApiError {
+  status: number;
+  success: false = false;
+  error: {
+    code: string;
+    message: string;
+    timestamp?: string;
+    requestId?: string;
+    cause?: unknown;
+  };
+
+  constructor(status: number, code: string, message: string, requestId?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.error = {
+      code,
+      message,
+      requestId,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  static fromResponse(response: Response): ApiErrorImpl {
+    const requestId = response.headers.get('x-request-id') || undefined;
+    return new ApiErrorImpl(
+      response.status,
+      `HTTP_${response.status}`,
+      `Request failed with status ${response.status}`,
+      requestId
+    );
+  }
+}
+
+/**
+ * Parse API error response
+ */
+async function parseErrorResponse(response: Response): Promise<ApiErrorImpl> {
+  try {
+    const data = await response.json();
+    if (data.error?.message) {
+      const requestId = response.headers.get('x-request-id') || undefined;
+      return new ApiErrorImpl(
+        response.status,
+        data.error.code || `HTTP_${response.status}`,
+        data.error.message,
+        requestId
+      );
+    }
+  } catch {
+    // Response is not JSON, use default error
+  }
+  return ApiErrorImpl.fromResponse(response);
+}
+
+/**
+ * Main API Client Class
+ */
 export class PollinationsAPI {
   private apiKey: string | null;
+  private requestCount = 0;
+  private lastResetTime = Date.now();
 
-  constructor(apiKey: string | null) {
+  constructor(apiKey: string | null = null) {
     this.apiKey = apiKey;
   }
 
   setApiKey(apiKey: string | null) {
     this.apiKey = apiKey;
+    logger.info('API key updated');
   }
 
-  private getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {};
-    if (this.apiKey) {
+  getApiKey(): string | null {
+    return this.apiKey;
+  }
+
+  private getHeaders(includeAuth = true): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (includeAuth && this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
+    
     return headers;
+  }
+
+  /**
+   * Generic request handler with rate limiting and retry logic
+   */
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    operationName = 'request'
+  ): Promise<T> {
+    return withRateLimit(async () => {
+      return withRetry(async () => {
+        const url = `${BASE_URL}${endpoint}`;
+        const headers = {
+          ...this.getHeaders(),
+          ...options.headers,
+        };
+
+        logger.debug(`${operationName}: ${options.method || 'GET'} ${url}`);
+        this.requestCount++;
+
+        const response = await fetchWithTimeout(url, { ...options, headers });
+
+        if (!response.ok) {
+          const error = await parseErrorResponse(response);
+          logger.error(`${operationName} failed:`, error);
+          throw error;
+        }
+
+        // Handle empty responses
+        const contentType = response.headers.get('content-type');
+        if (!contentType || contentType.includes('text/plain')) {
+          return response.text() as unknown as T;
+        }
+
+        return response.json() as Promise<T>;
+      }, operationName);
+    });
+  }
+
+  /**
+   * Fetch with binary response (for images, audio, video)
+   */
+  private async requestBinary(
+    endpoint: string,
+    options: RequestInit = {},
+    operationName = 'requestBinary'
+  ): Promise<string> {
+    return withRateLimit(async () => {
+      const url = `${BASE_URL}${endpoint}`;
+      const headers = {
+        ...this.getHeaders(),
+        ...options.headers,
+      };
+
+      logger.debug(`${operationName}: ${options.method || 'GET'} ${url}`);
+
+      const response = await fetchWithTimeout(url, { ...options, headers });
+
+      if (!response.ok) {
+        const error = await parseErrorResponse(response);
+        throw error;
+      }
+
+      // Return blob URL for binary data
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    });
   }
 
   async getImageModels(): Promise<ImageModel[]> {
     try {
-      const response = await fetch(`${BASE_URL}/image/models`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch image models');
-      }
-      return response.json();
+      const response = await this.request<any[]>(`/image/models`, {}, 'getImageModels');
+      return response || [];
     } catch (error) {
-      console.error('Error fetching image models:', error);
+      logger.error('Failed to fetch image models:', error);
       return [];
     }
   }
 
   async getVideoModels(): Promise<VideoModel[]> {
     try {
-      const response = await fetch(`${BASE_URL}/image/models`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch video models');
-      }
-      const data = await response.json();
+      const response = await this.request<any[]>(`/image/models`, {}, 'getVideoModels');
       // Filter for video models
-      return data.filter((m: any) => 
+      return (response || []).filter((m: any) =>
         m.output_modalities?.includes('video') || m.type === 'video'
       );
     } catch (error) {
-      console.error('Error fetching video models:', error);
+      logger.error('Failed to fetch video models:', error);
       return [];
     }
   }
 
   async getTextModels(): Promise<TextModel[]> {
     try {
-      const response = await fetch(`${BASE_URL}/v1/models`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch text models');
-      }
-      const data = await response.json();
-      return data.data || [];
+      const response = await this.request<{ data: TextModel[] }>(`/v1/models`, {}, 'getTextModels');
+      return response?.data || [];
     } catch (error) {
-      console.error('Error fetching text models:', error);
+      logger.error('Failed to fetch text models:', error);
       return [];
     }
   }
 
   async getAudioModels(): Promise<AudioModel[]> {
     try {
-      const response = await fetch(`${BASE_URL}/audio/models`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch audio models');
-      }
-      return response.json();
+      const response = await this.request<AudioModel[]>(`/audio/models`, {}, 'getAudioModels');
+      return response || [];
     } catch (error) {
-      console.error('Error fetching audio models:', error);
+      logger.error('Failed to fetch audio models:', error);
       return [];
     }
   }
 
   async generateImage(params: GenerationParams): Promise<string> {
     const { model, prompt, negativePrompt, width, height, seed, enhance, safe, quality, image, nologo, transparent, styleStrength, guidanceScale, steps } = params;
+
+    // Validate required parameters
+    if (!prompt?.trim()) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
+    }
 
     // Build URL with query parameters
     const urlParams = new URLSearchParams();
@@ -110,35 +349,32 @@ export class PollinationsAPI {
     const encodedPrompt = encodeURIComponent(prompt);
     const imageUrl = `${BASE_URL}/image/${encodedPrompt}?${urlParams.toString()}`;
 
-    // For generation, we need to fetch the image blob
-    const response = await fetch(imageUrl, {
+    logger.info('Generating image:', { model, width, height, seed });
+
+    // Fetch the image and return blob URL
+    const response = await fetchWithTimeout(imageUrl, {
       headers: this.getHeaders(),
     });
 
     if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({
-        status: response.status,
-        success: false,
-        error: {
-          code: 'GENERATION_ERROR',
-          message: 'Failed to generate image',
-        },
-      }));
-      throw new Error(errorData.error.message);
+      const error = await parseErrorResponse(response);
+      throw error;
     }
 
-    // Return the image URL directly (Pollinations returns the image)
-    // For the app, we'll use the constructed URL
-    return imageUrl;
+    return imageUrl; // Return URL directly for Pollinations
   }
 
   async generateVideo(params: GenerationParams & { duration?: number; audio?: boolean }): Promise<string> {
     const { model, prompt, seed, duration, aspectRatio, audio, image } = params;
 
+    if (!prompt?.trim()) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
+    }
+
     const urlParams = new URLSearchParams();
     urlParams.set('model', model);
     urlParams.set('seed', seed.toString());
-    
+
     if (duration) urlParams.set('duration', duration.toString());
     if (aspectRatio) urlParams.set('aspectRatio', aspectRatio);
     if (audio) urlParams.set('audio', 'true');
@@ -147,23 +383,29 @@ export class PollinationsAPI {
     const encodedPrompt = encodeURIComponent(prompt);
     const videoUrl = `${BASE_URL}/video/${encodedPrompt}?${urlParams.toString()}`;
 
+    logger.info('Generating video:', { model, duration, aspectRatio });
+
     return videoUrl;
   }
 
   async editImage(params: GenerationParams & { image: string }): Promise<string> {
     const { model, prompt, image, seed, enhance, safe, negativePrompt, nologo, transparent, width, height } = params;
 
-    console.log('📸 Edit Image - Using POST /v1/images/edits with multipart');
-    console.log('  Model:', model);
-    console.log('  Prompt:', prompt);
-    console.log('  Image URL:', image);
+    if (!prompt?.trim()) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
+    }
+
+    if (!image) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Reference image is required');
+    }
+
+    logger.info('Editing image:', { model, prompt: prompt.slice(0, 50) + '...' });
 
     // Use POST /v1/images/edits endpoint with multipart/form-data
-    // This is the OpenAI-compatible image editing endpoint
     const formData = new FormData();
     formData.append('model', model || 'flux');
     formData.append('prompt', prompt);
-    formData.append('image', image); // Image URL for editing
+    formData.append('image', image);
     formData.append('seed', seed.toString());
     if (enhance) formData.append('enhance', 'true');
     if (safe) formData.append('safe', 'true');
@@ -173,64 +415,63 @@ export class PollinationsAPI {
     formData.append('width', (width || 1024).toString());
     formData.append('height', (height || 1024).toString());
 
-    try {
-      const response = await fetch(`${BASE_URL}/v1/images/edits`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: formData,
-      });
+    return withRateLimit(async () => {
+      return withRetry(async () => {
+        const response = await fetchWithTimeout(`${BASE_URL}/v1/images/edits`, {
+          method: 'POST',
+          headers: this.getHeaders(false), // Don't set Content-Type for FormData
+          body: formData,
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Edit response:', data);
-      
-      const responseItem = data.data?.[0];
-      if (!responseItem) {
-        throw new Error('No image in response');
-      }
-
-      // Case 1: Response has a URL field — fetch and return as blob
-      if (responseItem.url) {
-        const url = responseItem.url;
-        if (url.startsWith('blob:') || url.startsWith('data:')) {
-          return url;
+        if (!response.ok) {
+          const error = await parseErrorResponse(response);
+          throw error;
         }
-        const imgResponse = await fetch(url);
-        const blob = await imgResponse.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        console.log('✅ Edit complete (url), blob URL:', blobUrl);
-        return blobUrl;
-      }
 
-      // Case 2: Response has b64_json — raw base64 string (NOT a data: URI)
-      // Convert to blob URL so it can be displayed as <img src>
-      if (responseItem.b64_json) {
-        const b64 = responseItem.b64_json;
-        // Decode base64 → binary → Blob → object URL
-        const byteChars = atob(b64);
-        const byteNumbers = new Uint8Array(byteChars.length);
-        for (let i = 0; i < byteChars.length; i++) {
-          byteNumbers[i] = byteChars.charCodeAt(i);
+        const data = await response.json();
+        const responseItem = data.data?.[0];
+
+        if (!responseItem) {
+          throw new ApiErrorImpl(500, 'NO_RESPONSE', 'No image in response');
         }
-        const blob = new Blob([byteNumbers], { type: 'image/jpeg' });
-        const blobUrl = URL.createObjectURL(blob);
-        console.log('✅ Edit complete (b64_json), blob URL:', blobUrl);
-        return blobUrl;
-      }
 
-      throw new Error('No image URL or b64_json in response');
-    } catch (error) {
-      console.error('Image edit error:', error);
-      throw error;
-    }
+        if (responseItem.url) {
+          if (responseItem.url.startsWith('blob:') || responseItem.url.startsWith('data:')) {
+            return responseItem.url;
+          }
+          // Fetch and convert to blob URL
+          const imgResponse = await fetchWithTimeout(responseItem.url);
+          const blob = await imgResponse.blob();
+          return URL.createObjectURL(blob);
+        }
+
+        if (responseItem.b64_json) {
+          const b64 = responseItem.b64_json;
+          const byteChars = atob(b64);
+          const byteNumbers = new Uint8Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) {
+            byteNumbers[i] = byteChars.charCodeAt(i);
+          }
+          const blob = new Blob([byteNumbers], { type: 'image/jpeg' });
+          return URL.createObjectURL(blob);
+        }
+
+        throw new ApiErrorImpl(500, 'INVALID_RESPONSE', 'No image URL or b64_json in response');
+      }, 'editImage');
+    });
   }
 
   async uploadImage(file: File): Promise<string> {
-    // Use Pollinations media storage with API key authentication
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      throw new ApiErrorImpl(400, 'INVALID_FILE_TYPE', 'Only image files are allowed');
+    }
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      throw new ApiErrorImpl(400, 'FILE_TOO_LARGE', `File must be smaller than ${maxSize / 1024 / 1024}MB`);
+    }
+
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -240,7 +481,7 @@ export class PollinationsAPI {
         headers['Authorization'] = `Bearer ${this.apiKey}`;
       }
 
-      const response = await fetch('https://media.pollinations.ai/upload', {
+      const response = await fetchWithTimeout(`${MEDIA_URL}/upload`, {
         method: 'POST',
         headers,
         body: formData,
@@ -248,24 +489,20 @@ export class PollinationsAPI {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Pollinations upload:', data);
+        logger.info('Upload successful:', data);
         if (data.url || data.imageUrl) {
           return data.url || data.imageUrl;
         }
-      } else {
-        const error = await response.json().catch(() => ({}));
-        console.warn('Pollinations upload error:', response.status, error);
       }
-    } catch (error) {
-      console.warn('Pollinations upload failed:', error);
-    }
 
-    // Fallback: For users without API key or if upload fails,
-    // we need to use a different approach
-    // Since Pollinations image editing via GET /image/{prompt} doesn't support base64,
-    // we'll need to inform the user to use a public image URL instead
-    
-    throw new Error('Image upload failed. Please ensure you have an API key set in Settings, or use a public image URL.');
+      const error = await parseErrorResponse(response);
+      throw error;
+    } catch (error) {
+      logger.error('Upload failed:', error);
+      throw error instanceof ApiErrorImpl
+        ? error
+        : new ApiErrorImpl(500, 'UPLOAD_FAILED', 'Failed to upload image');
+    }
   }
 
   async generateImageOpenAI(params: {
@@ -283,43 +520,31 @@ export class PollinationsAPI {
     guidance?: number;
     steps?: number;
   }): Promise<string> {
-    const response = await fetch(`${BASE_URL}/v1/images/generations`, {
-      method: 'POST',
-      headers: {
-        ...this.getHeaders(),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
-
-    if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({
-        status: response.status,
-        success: false,
-        error: {
-          code: 'GENERATION_ERROR',
-          message: 'Failed to generate image',
-        },
-      }));
-      throw new Error(errorData.error.message);
+    if (!params.prompt?.trim()) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
     }
 
-    const data = await response.json();
-    const item = data.data?.[0];
-    if (!item) return '';
+    return this.request<{ data: Array<{ url?: string; b64_json?: string }> }>(
+      `/v1/images/generations`,
+      {
+        method: 'POST',
+        body: JSON.stringify(params),
+      },
+      'generateImageOpenAI'
+    ).then(data => {
+      const item = data.data?.[0];
+      if (!item) {
+        throw new ApiErrorImpl(500, 'NO_RESPONSE', 'No image in response');
+      }
 
-    if (item.url) {
-      if (item.url.startsWith('blob:') || item.url.startsWith('data:')) {
+      if (item.url) {
         return item.url;
       }
-      return item.url;
-    }
 
-    if (item.b64_json) {
-      const b64 = item.b64_json;
-      if (b64.startsWith('data:')) return b64;
+      if (item.b64_json) {
+        const b64 = item.b64_json;
+        if (b64.startsWith('data:')) return b64;
 
-      try {
         const byteChars = atob(b64);
         const byteNumbers = new Uint8Array(byteChars.length);
         for (let i = 0; i < byteChars.length; i++) {
@@ -327,24 +552,20 @@ export class PollinationsAPI {
         }
         const blob = new Blob([byteNumbers], { type: 'image/jpeg' });
         return URL.createObjectURL(blob);
-      } catch (e) {
-        return `data:image/jpeg;base64,${b64}`;
       }
-    }
-    return '';
+
+      throw new ApiErrorImpl(500, 'INVALID_RESPONSE', 'No image URL or b64_json in response');
+    });
   }
 
   async checkBalance(): Promise<number | null> {
     if (!this.apiKey) return null;
 
     try {
-      const response = await fetch(`${BASE_URL}/account/balance`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) return null;
-      const data = await response.json();
-      return data.balance || 0;
-    } catch {
+      const response = await this.request<{ balance: number }>(`/account/balance`, {}, 'checkBalance');
+      return response?.balance ?? null;
+    } catch (error) {
+      logger.error('Failed to check balance:', error);
       return null;
     }
   }
@@ -353,12 +574,9 @@ export class PollinationsAPI {
     if (!this.apiKey) return null;
 
     try {
-      const response = await fetch(`${BASE_URL}/account/profile`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) return null;
-      return response.json();
-    } catch {
+      return await this.request<UserProfile>(`/account/profile`, {}, 'getProfile');
+    } catch (error) {
+      logger.error('Failed to get profile:', error);
       return null;
     }
   }
@@ -371,17 +589,16 @@ export class PollinationsAPI {
       if (limit) params.set('limit', limit.toString());
       params.set('format', format);
 
-      const response = await fetch(`${BASE_URL}/account/usage?${params}`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) return null;
-
+      const endpoint = `/account/usage?${params}`;
+      
       if (format === 'csv') {
-        return response.text();
+        return this.request<string>(endpoint, {}, 'getUsageCSV');
       }
-      const data = await response.json();
-      return data.usage || [];
-    } catch {
+      
+      const response = await this.request<{ usage: UsageRecord[] }>(endpoint, {}, 'getUsage');
+      return response?.usage ?? [];
+    } catch (error) {
+      logger.error('Failed to get usage:', error);
       return null;
     }
   }
@@ -394,17 +611,16 @@ export class PollinationsAPI {
       if (days) params.set('days', days.toString());
       params.set('format', format);
 
-      const response = await fetch(`${BASE_URL}/account/usage/daily?${params}`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) return null;
-
+      const endpoint = `/account/usage/daily?${params}`;
+      
       if (format === 'csv') {
-        return response.text();
+        return this.request<string>(endpoint, {}, 'getDailyUsageCSV');
       }
-      const data = await response.json();
-      return data.usage || [];
-    } catch {
+      
+      const response = await this.request<{ usage: DailyUsageRecord[] }>(endpoint, {}, 'getDailyUsage');
+      return response?.usage ?? [];
+    } catch (error) {
+      logger.error('Failed to get daily usage:', error);
       return null;
     }
   }
@@ -413,12 +629,9 @@ export class PollinationsAPI {
     if (!this.apiKey) return null;
 
     try {
-      const response = await fetch(`${BASE_URL}/account/key`, {
-        headers: this.getHeaders(),
-      });
-      if (!response.ok) return null;
-      return response.json();
-    } catch {
+      return await this.request<ApiKeyInfo>(`/account/key`, {}, 'getApiKeyInfo');
+    } catch (error) {
+      logger.error('Failed to get API key info:', error);
       return null;
     }
   }
@@ -432,6 +645,10 @@ export class PollinationsAPI {
     json?: boolean;
     stream?: boolean;
   }): Promise<string> {
+    if (!params.prompt?.trim()) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
+    }
+
     const { model, prompt, system, temperature, seed, json, stream } = params;
 
     const urlParams = new URLSearchParams();
@@ -443,23 +660,12 @@ export class PollinationsAPI {
     if (stream) urlParams.set('stream', 'true');
 
     const encodedPrompt = encodeURIComponent(prompt);
-    const response = await fetch(`${BASE_URL}/text/${encodedPrompt}?${urlParams}`, {
-      headers: this.getHeaders(),
-    });
 
-    if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({
-        status: response.status,
-        success: false,
-        error: {
-          code: 'TEXT_GENERATION_ERROR',
-          message: 'Failed to generate text',
-        },
-      }));
-      throw new Error(errorData.error.message);
-    }
-
-    return response.text();
+    return this.request<string>(
+      `/text/${encodedPrompt}?${urlParams}`,
+      {},
+      'generateText'
+    );
   }
 
   async generateAudio(params: {
@@ -468,6 +674,10 @@ export class PollinationsAPI {
     model?: string;
     duration?: number;
   }): Promise<string> {
+    if (!params.text?.trim()) {
+      throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Text is required');
+    }
+
     const { text, voice, model, duration } = params;
 
     const urlParams = new URLSearchParams();
@@ -480,6 +690,29 @@ export class PollinationsAPI {
 
     return audioUrl;
   }
+
+  /**
+   * Get request statistics
+   */
+  getRequestStats(): { count: number; rateLimited: boolean } {
+    const now = Date.now();
+    const recentRequests = requestTimestamps.filter(ts => ts > now - RATE_LIMIT_WINDOW);
+    
+    return {
+      count: this.requestCount,
+      rateLimited: recentRequests.length >= RATE_LIMIT_REQUESTS,
+    };
+  }
+
+  /**
+   * Reset request counter
+   */
+  resetRequestStats(): void {
+    this.requestCount = 0;
+    this.lastResetTime = Date.now();
+    requestTimestamps.length = 0;
+  }
 }
 
+// Export singleton instance
 export const pollinationsAPI = new PollinationsAPI(null);
