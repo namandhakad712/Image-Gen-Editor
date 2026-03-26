@@ -40,12 +40,12 @@ const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(r
  */
 async function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
   const now = Date.now();
-  
+
   // Remove old timestamps outside the window
   while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW) {
     requestTimestamps.shift();
   }
-  
+
   // If at rate limit, wait until oldest request expires
   if (requestTimestamps.length >= RATE_LIMIT_REQUESTS) {
     const waitTime = (requestTimestamps[0] + RATE_LIMIT_WINDOW) - now;
@@ -55,10 +55,10 @@ async function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
       return withRateLimit(fn); // Retry after waiting
     }
   }
-  
+
   // Record this request
   requestTimestamps.push(now);
-  
+
   try {
     return await fn();
   } catch (error) {
@@ -73,18 +73,18 @@ async function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
  */
 async function withRetry<T>(fn: () => Promise<T>, operationName: string): Promise<T> {
   let lastError: unknown;
-  
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      
+
       // Don't retry on client errors (4xx) except 429
       if (error instanceof ApiErrorImpl && error.status >= 400 && error.status < 500 && error.status !== 429) {
         throw error;
       }
-      
+
       if (attempt < MAX_RETRIES) {
         const delay = RETRY_DELAY * Math.pow(RETRY_BACKOFF, attempt);
         logger.warn(`${operationName} failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
@@ -92,7 +92,7 @@ async function withRetry<T>(fn: () => Promise<T>, operationName: string): Promis
       }
     }
   }
-  
+
   throw lastError;
 }
 
@@ -106,7 +106,7 @@ async function fetchWithTimeout(
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -201,11 +201,11 @@ export class PollinationsAPI {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (includeAuth && this.apiKey) {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
-    
+
     return headers;
   }
 
@@ -417,9 +417,14 @@ export class PollinationsAPI {
 
     return withRateLimit(async () => {
       return withRetry(async () => {
+        const headers: HeadersInit = {};
+        if (this.apiKey) {
+          headers['Authorization'] = `Bearer ${this.apiKey}`;
+        }
+
         const response = await fetchWithTimeout(`${BASE_URL}/v1/images/edits`, {
           method: 'POST',
-          headers: this.getHeaders(false), // Don't set Content-Type for FormData
+          headers, // Let browser set Content-Type for FormData (with boundary)
           body: formData,
         });
 
@@ -590,11 +595,11 @@ export class PollinationsAPI {
       params.set('format', format);
 
       const endpoint = `/account/usage?${params}`;
-      
+
       if (format === 'csv') {
         return this.request<string>(endpoint, {}, 'getUsageCSV');
       }
-      
+
       const response = await this.request<{ usage: UsageRecord[] }>(endpoint, {}, 'getUsage');
       return response?.usage ?? [];
     } catch (error) {
@@ -612,11 +617,11 @@ export class PollinationsAPI {
       params.set('format', format);
 
       const endpoint = `/account/usage/daily?${params}`;
-      
+
       if (format === 'csv') {
         return this.request<string>(endpoint, {}, 'getDailyUsageCSV');
       }
-      
+
       const response = await this.request<{ usage: DailyUsageRecord[] }>(endpoint, {}, 'getDailyUsage');
       return response?.usage ?? [];
     } catch (error) {
@@ -697,7 +702,7 @@ export class PollinationsAPI {
   getRequestStats(): { count: number; rateLimited: boolean } {
     const now = Date.now();
     const recentRequests = requestTimestamps.filter(ts => ts > now - RATE_LIMIT_WINDOW);
-    
+
     return {
       count: this.requestCount,
       rateLimited: recentRequests.length >= RATE_LIMIT_REQUESTS,

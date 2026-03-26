@@ -1088,13 +1088,15 @@ export default function SpatialImageEditor() {
           {activeTool === 'pen' && (
             <canvas
               ref={drawingCanvasRef}
-              className="absolute touch-none pointer-events-none"
               style={{
+                position: 'absolute',
                 left: -5000,
                 top: -5000,
                 width: 10000,
                 height: 10000,
                 zIndex: 100,
+                pointerEvents: 'auto',
+                touchAction: 'none',
               }}
             />
           )}
