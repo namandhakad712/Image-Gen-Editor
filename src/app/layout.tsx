@@ -85,6 +85,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: APP_DEFAULT_TITLE,
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
   formatDetection: {
     email: false,
     address: false,
