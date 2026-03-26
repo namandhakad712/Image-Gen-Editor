@@ -20,7 +20,7 @@ import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS, API_
 import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
 import { gsap } from 'gsap';
 import { animateEntrance, animateModalOpen, animateButtonClick, animateToastIn } from '@/lib/gsapAnimations';
-import { imageDB } from '@/lib/imageStorage';
+import { imageDB, saveImageInstant, loadImagesFromStorage, loadCanvasImagesFromStorage } from '@/lib/imageStorage';
 
 // No GSAP plugins needed - using native pointer events for better performance
 
@@ -144,8 +144,9 @@ export default function SpatialImageEditor() {
   const [customAspectUnit, setCustomAspectUnit] = useState('px');
   const [customAspectRatios, setCustomAspectRatios] = useState<Array<{ id: string; label: string; width: number; height: number }>>([]);
 
-  // Load custom styles from localStorage
+  // Load custom styles and canvas images on mount
   useEffect(() => {
+    // Load custom styles from localStorage
     const saved = localStorage.getItem('pollinations_custom_styles');
     if (saved) {
       try {
@@ -156,19 +157,47 @@ export default function SpatialImageEditor() {
       }
     }
 
-    // Load canvas images from localStorage
-    const savedCanvas = localStorage.getItem('pollinations_canvas_images');
-    if (savedCanvas) {
+    // Load canvas images from IndexedDB first (primary), fallback to localStorage
+    const loadCanvasImages = async () => {
       try {
-        const parsed = JSON.parse(savedCanvas);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCanvasImages(parsed);
-          console.log('Loaded canvas images from localStorage:', parsed.length);
+        // Try to load from IndexedDB first (stores actual image blobs)
+        const canvasImagesData = await loadCanvasImagesFromStorage();
+        if (canvasImagesData && canvasImagesData.length > 0) {
+          // Convert to canvas format
+          const formatted = canvasImagesData.map((img: any) => ({
+            id: img.id,
+            url: img.url,
+            x: img.x,
+            y: img.y,
+            width: img.width,
+            height: img.height,
+            prompt: img.prompt,
+            seed: img.seed,
+          }));
+          setCanvasImages(formatted);
+          console.log('📥 Loaded', formatted.length, 'canvas images from IndexedDB');
+          return;
         }
       } catch (e) {
-        console.error('Failed to load canvas images:', e);
+        console.warn('IndexedDB load failed, trying localStorage:', e);
       }
-    }
+
+      // Fallback to localStorage for legacy data
+      const savedCanvas = localStorage.getItem('pollinations_canvas_images');
+      if (savedCanvas) {
+        try {
+          const parsed = JSON.parse(savedCanvas);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCanvasImages(parsed);
+            console.log('📥 Loaded canvas images from localStorage:', parsed.length);
+          }
+        } catch (e) {
+          console.error('Failed to load canvas images:', e);
+        }
+      }
+    };
+
+    loadCanvasImages();
 
     // Load seed locked state from localStorage
     const savedSeedLocked = localStorage.getItem('pollinations_seed_locked');
@@ -789,6 +818,16 @@ export default function SpatialImageEditor() {
       const newImages = [...canvasImages, newImg];
       setCanvasImages(newImages);
       setSelectedImageId(newImg.id);
+
+      // INSTANT PERSISTENCE: Save to IndexedDB immediately as image is shown
+      // This ensures images are never lost even if browser crashes
+      saveImageInstant(historyItem).then(success => {
+        if (success) {
+          console.log('✅ Image persisted to IndexedDB');
+        } else {
+          console.warn('⚠️ IndexedDB save failed, image still in memory');
+        }
+      });
 
       // Only update seed display if not locked - keep the value for reference but reset to -1 for next generation
       if (!seedLocked) {

@@ -7,7 +7,8 @@ import {
   Video, BarChart3, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate, imageStorage, storage } from '@/lib/utils';
+import { formatDate, storage } from '@/lib/utils';
+import { imageDB, loadImagesFromStorage, deleteImageFromStorage, clearAllImagesFromStorage } from '@/lib/imageStorage';
 import { HistoryItem } from '@/types';
 import { gsap } from 'gsap';
 
@@ -22,7 +23,7 @@ export default function HistoryPage() {
   useEffect(() => {
     // Load images from IndexedDB first, fallback to localStorage
     const loadHistory = async () => {
-      const dbImages = await imageStorage.getAllImages();
+      const dbImages = await imageDB.getAllImages();
       if (dbImages.length > 0) {
         setHistory(dbImages);
       } else {
@@ -59,7 +60,7 @@ export default function HistoryPage() {
 
   const handleDelete = async (id: string) => {
     // Remove from both IndexedDB and localStorage
-    await imageStorage.deleteImage(id);
+    await imageDB.deleteImage(id);
     storage.removeFromHistory(id);
     setHistory(prev => prev.filter(item => item.id !== id));
     if (selectedItem?.id === id) setSelectedItem(null);
@@ -68,7 +69,7 @@ export default function HistoryPage() {
 
   const handleClearAll = async () => {
     if (confirm('Clear all history? This will delete all saved images.')) {
-      await imageStorage.clearAllImages();
+      await imageDB.clearAll();
       storage.clearHistory();
       setHistory([]);
       setSelectedItem(null);
