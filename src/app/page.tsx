@@ -16,6 +16,8 @@ import { HistoryItem, GenerationParams } from '@/types';
 import { ART_STYLES, STYLE_CATEGORIES, ArtStyle } from '@/lib/styles';
 import { generateRandomPrompt, getRandomAppend, processPromptVariables } from '@/lib/prompts';
 import { useTheme } from '@/lib/theme';
+import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS } from '@/lib/apiConfig';
+import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
 
 // =============================================
 //  CONSTANTS
@@ -43,67 +45,6 @@ const MODIFIER_PROMPTS = ALL_MODIFIERS.reduce((acc, m) => {
   acc[m.label] = m.prompt;
   return acc;
 }, {} as Record<string, string>);
-
-const DEFAULT_MODELS = [
-  { value: 'flux', label: 'Flux Schnell' },
-  { value: 'zimage', label: 'Z-Image Turbo' },
-  { value: 'gptimage', label: 'GPT Image 1 Mini' },
-  { value: 'gptimage-large', label: 'GPT Image 1.5' },
-  { value: 'nanobanana', label: 'NanoBanana' },
-  { value: 'nanobanana-2', label: 'NanoBanana 2' },
-  { value: 'nanobanana-pro', label: 'NanoBanana Pro' },
-  { value: 'klein', label: 'FLUX.2 Klein 4B' },
-  { value: 'kontext', label: 'FLUX.1 Kontext' },
-  { value: 'seedream5', label: 'Seedream 5.0 Lite' },
-  { value: 'seedream', label: 'Seedream 4.0' },
-  { value: 'seedream-pro', label: 'Seedream 4.5 Pro' },
-  { value: 'qwen-image', label: 'Qwen Image Plus' },
-  { value: 'grok-imagine', label: 'Grok Imagine' },
-  { value: 'grok-imagine-pro', label: 'Grok Imagine Pro' },
-  { value: 'p-image', label: 'Pruna p-image' },
-  { value: 'p-image-edit', label: 'Pruna p-image-edit' },
-  { value: 'nova-canvas', label: 'Amazon Nova Canvas' },
-];
-
-// Helper function to filter models by supported endpoints
-function filterModelsByEndpoint(models: any[], endpoint: string): any[] {
-  return models.filter(m =>
-    m.supported_endpoints?.includes(endpoint)
-  );
-}
-
-// Filter image models
-// The API at image.pollinations.ai/models returns models with `name` (not `id`)
-// and `output_modalities` but may not have `supported_endpoints`.
-// We filter by output_modalities containing 'image'.
-function getImageModels(models: any[]): any[] {
-  return models.filter(m => {
-    // Primary filter: output must include 'image'
-    const outputsImage = m.output_modalities?.includes('image');
-    // If supported_endpoints exists, also check it includes an image endpoint
-    const hasImageEndpoint = !m.supported_endpoints ||
-      m.supported_endpoints.some((ep: string) =>
-        ep.includes('image') || ep.includes('/v1/images')
-      );
-    return outputsImage && hasImageEndpoint;
-  });
-}
-
-// Filter video models (models that output video)
-function getVideoModels(models: any[]): any[] {
-  return models.filter(m =>
-    m.output_modalities?.includes('video') ||
-    m.supported_endpoints?.includes('/video/{prompt}')
-  );
-}
-
-// Filter text models (models that support text generation)
-function getTextModelsForEnhancement(models: any[]): any[] {
-  return models.filter(m =>
-    m.supported_endpoints?.includes('/v1/chat/completions') ||
-    m.supported_endpoints?.includes('/text/{prompt}')
-  ).filter(m => m.output_modalities?.includes('text'));
-}
 
 const APP_REDIRECT_URL = typeof window !== 'undefined' ? window.location.origin : 'https://image-gen-editor.vercel.app';
 const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
@@ -174,7 +115,7 @@ export default function SpatialImageEditor() {
   const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [models, setModels] = useState(DEFAULT_MODELS);
+  const [models, setModels] = useState<Array<{ value: string; label: string }>>([...DEFAULT_IMAGE_MODELS.image]);
   // Raw model data from API, keyed by model name — stores input_modalities etc.
   const [rawModelData, setRawModelData] = useState<Record<string, any>>({});
   const [selectedStyle, setSelectedStyle] = useState<ArtStyle>(ART_STYLES[0]);
@@ -260,8 +201,8 @@ export default function SpatialImageEditor() {
   //  Live Models Fetch (Image models only)
   // =============================================
   useEffect(() => {
-    // Fetch from gen.pollinations.ai/image/models as specified
-    fetch('https://gen.pollinations.ai/image/models')
+    // Fetch from centralized API config
+    fetch(API_CONFIG.getModelsUrl('image'))
       .then(res => res.json())
       .then((data: any[]) => {
         console.log('📦 All models from API:', data.length);
@@ -270,19 +211,13 @@ export default function SpatialImageEditor() {
           console.log('Sample model:', data[0].name, 'output_modalities:', data[0].output_modalities, 'input_modalities:', data[0].input_modalities);
         }
 
-        // Filter for image models only based on input_modalities and output_modalities
-        // Models that accept image input are for editing
-        // Models that output image are for generation
-        const imageModels = data.filter((m: any) => {
-          // Check if model outputs images
-          const outputsImage = m.output_modalities?.includes('image');
-          return outputsImage;
-        });
+        // Filter for image models only using centralized MODEL_FILTERS
+        const imageModels = data.filter(MODEL_FILTERS.imageModels);
         console.log('✅ Filtered image models:', imageModels.length);
 
         // Log which models support image editing (accept image input)
-        const editModels = imageModels.filter((m: any) => m.input_modalities?.includes('image'));
-        const genOnlyModels = imageModels.filter((m: any) => !m.input_modalities?.includes('image'));
+        const editModels = imageModels.filter(MODEL_FILTERS.imageEditingModels);
+        const genOnlyModels = imageModels.filter(m => !MODEL_FILTERS.imageEditingModels(m));
         console.log('🖊️ Edit-capable models:', editModels.map((m: any) => m.name));
         console.log('🖼️ Generation-only models:', genOnlyModels.map((m: any) => m.name));
 
@@ -597,7 +532,8 @@ export default function SpatialImageEditor() {
         width: aspectRatio.width, height: aspectRatio.height,
         prompt: fullPrompt,
       };
-      setCanvasImages(prev => [...prev, newImg]);
+      const newImages = [...canvasImages, newImg];
+      setCanvasImages(newImages);
       setSelectedImageId(newImg.id);
       setSeed(actualSeed);
 
@@ -630,7 +566,8 @@ export default function SpatialImageEditor() {
       storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 30));
 
       // Save canvas images to localStorage
-      localStorage.setItem('pollinations_canvas_images', JSON.stringify([...canvasImages, newImg]));
+      const prevImages = [...canvasImages, newImg];
+      localStorage.setItem('pollinations_canvas_images', JSON.stringify(prevImages));
 
       // Clear reference images after successful generation
       if (isEditMode) {
@@ -860,10 +797,21 @@ export default function SpatialImageEditor() {
   };
 
   const deleteImage = (id: string) => {
+    // Get the image being deleted (to find its URL for history)
+    const imgToDelete = canvasImages.find(img => img.id === id);
+
     setCanvasImages(prev => {
       const newImages = prev.filter(img => img.id !== id);
-      // Save to localStorage
+      // Save to localStorage - removes from both canvas AND localStorage
       localStorage.setItem('pollinations_canvas_images', JSON.stringify(newImages));
+
+      // Also remove from history if we found the image
+      if (imgToDelete) {
+        const history = storage.getHistory();
+        const newHistory = history.filter(item => item.imageUrl !== imgToDelete.url);
+        storage.setHistory(newHistory);
+      }
+
       return newImages;
     });
     if (selectedImageId === id) setSelectedImageId(null);
@@ -871,6 +819,13 @@ export default function SpatialImageEditor() {
   };
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
+
+  // Clear canvas (remove all images from view but keep in localStorage)
+  const clearCanvas = () => {
+    setCanvasImages([]);
+    setSelectedImageId(null);
+    toast.success('Canvas cleared. Images are saved in history.');
+  };
 
   // =============================================
   //  DRAWING LOGIC (with undo/redo and image support)
@@ -1179,6 +1134,11 @@ export default function SpatialImageEditor() {
               <div className="px-3 py-2 flex items-center justify-between">
                 <span className="text-xs text-zinc-400">Zoom: {Math.round(zoom * 100)}%</span>
                 <button onClick={resetView} className="text-xs font-semibold text-[#EF8354] hover:underline">Reset View</button>
+              </div>
+              <div className="px-3 py-2 flex items-center justify-between">
+                <button onClick={clearCanvas} className="text-xs font-semibold text-red-500 hover:underline flex items-center gap-1">
+                  <Trash2 size={12} /> Clear Canvas
+                </button>
               </div>
             </div>
           )}
