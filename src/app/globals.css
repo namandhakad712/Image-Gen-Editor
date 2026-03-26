@@ -35,6 +35,11 @@ body {
   color: white;
 }
 
+/* Hardcoded override for selection when CSS var is not loaded */
+.selection-bg-hardcoded {
+  background: #EF8354;
+}
+
 /* ==============================
    GLASS PANELS - Enhanced Gaussian Blur
    ============================== */

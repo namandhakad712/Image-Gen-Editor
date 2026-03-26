@@ -41,20 +41,29 @@ export default function VideoPage() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [rawModelData, setRawModelData] = useState<Record<string, any>>({});
 
   // Fetch video models from live API
   useEffect(() => {
-    fetch('https://image.pollinations.ai/models')
+    // Fetch from gen.pollinations.ai/image/models as specified
+    fetch('https://gen.pollinations.ai/image/models')
       .then(res => res.json())
       .then((data: any[]) => {
         // Filter for video models based on output_modalities
-        const videoModels = data.filter(m => 
+        const videoModels = data.filter((m: any) =>
           m.output_modalities?.includes('video')
         );
         if (videoModels.length > 0) {
-          setModels(videoModels.map(m => ({ 
-            value: m.name, 
-            label: m.description || m.name || m.id 
+          // Store raw model data for paid_only check
+          const rawData: Record<string, any> = {};
+          videoModels.forEach((m: any) => {
+            rawData[m.name] = m;
+          });
+          setRawModelData(rawData);
+
+          setModels(videoModels.map(m => ({
+            value: m.name,
+            label: m.description || m.name
           })));
         }
       }).catch(err => console.error('Failed to fetch video models:', err));
@@ -92,7 +101,7 @@ export default function VideoPage() {
     setIsGenerating(true);
     try {
       const actualSeed = seed === -1 ? Math.floor(Math.random() * 999999999) : seed;
-      
+
       const params: GenerationParams & { duration?: number; audio?: boolean } = {
         model: selectedModel,
         prompt,
@@ -249,7 +258,7 @@ export default function VideoPage() {
 
         {/* Generation Form */}
         <div className="glass-panel rounded-3xl p-6 space-y-6">
-          
+
           {/* Prompt */}
           <div className="space-y-2">
             <label className="text-sm font-semibold text-zinc-700">Video Prompt</label>
@@ -295,12 +304,19 @@ export default function VideoPage() {
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+                className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 pr-10 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
               >
-                {models.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                {models.map(m => <option key={m.value} value={m.value}>{rawModelData[m.value]?.paid_only ? '🔒 ' : ''}{m.label}</option>)}
               </select>
               <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
             </div>
+            {/* Show pro badge if current model is paid_only */}
+            {rawModelData[selectedModel]?.paid_only && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200">
+                <span className="text-[10px]">🔒</span>
+                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Premium Model</span>
+              </div>
+            )}
           </div>
 
           {/* Video Settings */}
@@ -333,11 +349,10 @@ export default function VideoPage() {
                   <button
                     key={ratio.id}
                     onClick={() => setAspectRatio(ratio.value)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                      aspectRatio === ratio.value
-                        ? 'bg-[#EF8354] text-white shadow-md'
-                        : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                    }`}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${aspectRatio === ratio.value
+                      ? 'bg-[#EF8354] text-white shadow-md'
+                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                      }`}
                   >
                     {ratio.label}
                   </button>
@@ -387,11 +402,10 @@ export default function VideoPage() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating || !hasApiKey}
-            className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${
-              isGenerating || !hasApiKey
-                ? 'bg-zinc-400 cursor-not-allowed shadow-none'
-                : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl text-white'
-            }`}
+            className={`w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${isGenerating || !hasApiKey
+              ? 'bg-zinc-400 cursor-not-allowed shadow-none'
+              : 'bg-[#EF8354] hover:bg-[#e27344] shadow-[#EF8354]/25 hover:shadow-xl text-white'
+              }`}
           >
             {isGenerating ? (
               <>

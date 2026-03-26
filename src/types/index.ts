@@ -8,6 +8,7 @@ export interface ImageModel {
   description?: string;
   name?: string;
   type?: string;
+  paid_only?: boolean;
 }
 
 export interface VideoModel {
@@ -20,6 +21,7 @@ export interface VideoModel {
   description?: string;
   name?: string;
   type?: string;
+  paid_only?: boolean;
 }
 
 export interface AudioModel {

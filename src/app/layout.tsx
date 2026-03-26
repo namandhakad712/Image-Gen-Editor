@@ -104,6 +104,11 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+/**
+ * Root Layout
+ * Note: Theme colors are applied dynamically via ThemeProvider and CSS variables
+ * The hardcoded #EF8354 in selection classes will be overridden by CSS var(--accent-color)
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -120,7 +125,7 @@ export default function RootLayout({
         {/* DNS prefetch for analytics */}
         <link rel="dns-prefetch" href="https://analytics.vercel.com" />
       </head>
-      <body className="selection:bg-[#EF8354] selection:text-white antialiased">
+      <body className="antialiased">
         <Providers>
           <ThemeProvider>
             {children}

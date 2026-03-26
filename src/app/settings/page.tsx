@@ -28,9 +28,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [recentImages, setRecentImages] = useState<HistoryItem[]>([]);
   const [stats, setStats] = useState({ total: 0, thisWeek: 0, pollenSpent: 0 });
-  
+
   const { accentColor, setAccentColor } = useTheme();
-  const [showColorPicker, setShowColorPicker] = useState(false);
 
   // Load data with caching
   const loadAllData = useCallback(async () => {
@@ -47,13 +46,13 @@ export default function SettingsPage() {
       setProfile(prof);
       setKeyInfo(info);
       setRecentImages(history.slice(0, 6));
-      
+
       // Calculate stats
       const now = Date.now();
       const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
       const weekImages = history.filter(h => h.createdAt > weekAgo);
       const totalCost = history.reduce((sum, h) => sum + (h.params?.width ? 0.001 : 0.002), 0);
-      
+
       setStats({
         total: history.length,
         thisWeek: weekImages.length,
@@ -142,6 +141,16 @@ export default function SettingsPage() {
     return icons[tier?.toLowerCase()] || '🌟';
   };
 
+  // Helper to convert hex to RGB
+  const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  };
+
   return (
     <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-auto bg-gradient-to-br from-zinc-50 via-white to-zinc-100">
 
@@ -181,7 +190,7 @@ export default function SettingsPage() {
 
       {/* Main Content - Bento Grid */}
       <div className="max-w-7xl mx-auto pt-28 px-4 md:px-6 pb-10">
-        
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-zinc-800 mb-2">Settings</h1>
@@ -282,7 +291,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-zinc-400">Your secret key</p>
               </div>
             </div>
-            
+
             {hasKey ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-zinc-100/80 border border-zinc-200">
@@ -391,7 +400,7 @@ export default function SettingsPage() {
             </div>
             <div className="mt-4 p-4 rounded-2xl bg-white/60 backdrop-blur-sm">
               <p className="text-xs text-zinc-600 leading-relaxed">
-                <strong className="text-zinc-800">How it works:</strong> Your users connect their Pollinations account and use their own pollen balance. 
+                <strong className="text-zinc-800">How it works:</strong> Your users connect their Pollinations account and use their own pollen balance.
                 You pay $0 for API usage. Perfect for scaling apps without compute costs.
               </p>
             </div>
@@ -406,57 +415,137 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-zinc-800">Theme Color</h3>
-                  <p className="text-xs text-zinc-400">Personalize your accent color</p>
+                  <p className="text-xs text-zinc-400">Pick any color you love</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold border border-zinc-200 hover:bg-zinc-50 transition-all flex items-center gap-2"
-              >
-                {showColorPicker ? 'Close' : 'Choose Color'}
-                <ChevronRight size={14} className={`transition-transform ${showColorPicker ? 'rotate-90' : ''}`} />
-              </button>
             </div>
 
-            {/* Current Color Preview */}
+            {/* Current Color Preview & Color Picker */}
             <div className="flex items-center gap-4 mb-4 p-4 rounded-2xl bg-zinc-50/80 border border-zinc-200">
               <div
-                className="w-12 h-12 rounded-xl shadow-lg"
+                className="w-16 h-16 rounded-xl shadow-lg border-2 border-white"
                 style={{ backgroundColor: accentColor }}
               />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-zinc-800">Current: {COLOR_PALETTE.find(c => c.value === accentColor)?.name || 'Custom'}</p>
-                <p className="text-xs text-zinc-500 font-mono">{accentColor}</p>
+                <p className="text-sm font-semibold text-zinc-800 mb-2">Choose Your Accent Color</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={accentColor}
+                    onChange={(e) => {
+                      setAccentColor(e.target.value);
+                      toast.success(`Theme color updated`);
+                    }}
+                    className="w-12 h-12 rounded-lg cursor-pointer border-2 border-zinc-200 bg-white p-1 hover:border-[#EF8354] transition-colors"
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs text-zinc-500 font-mono">{accentColor}</p>
+                    <p className="text-[10px] text-zinc-400">Click to pick any color</p>
+                  </div>
+                  <CheckCircle2 size={20} className="text-green-500" />
+                </div>
               </div>
-              <CheckCircle2 size={20} className="text-green-500" />
             </div>
 
-            {/* Color Palette Grid */}
-            {showColorPicker && (
-              <div className="grid grid-cols-6 md:grid-cols-12 gap-3">
+            {/* RGB Color Picker */}
+            <div className="mb-4 p-4 rounded-2xl bg-zinc-50/80 border border-zinc-200">
+              <p className="text-xs font-semibold text-zinc-600 mb-3">Or enter RGB values</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="255"
+                    placeholder="R"
+                    className="w-full p-2 rounded-lg bg-white border border-zinc-200 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                    onChange={(e) => {
+                      const r = parseInt(e.target.value) || 0;
+                      if (r <= 255 && r >= 0) {
+                        const currentRgb = hexToRgb(accentColor);
+                        const g = currentRgb?.g || 0;
+                        const b = currentRgb?.b || 0;
+                        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                        setAccentColor(hex);
+                      }
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="255"
+                    placeholder="G"
+                    data-rgb-g
+                    className="w-full p-2 rounded-lg bg-white border border-zinc-200 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                    onChange={(e) => {
+                      const g = parseInt(e.target.value) || 0;
+                      if (g <= 255 && g >= 0) {
+                        const currentRgb = hexToRgb(accentColor);
+                        const r = currentRgb?.r || 0;
+                        const b = currentRgb?.b || 0;
+                        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                        setAccentColor(hex);
+                      }
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="255"
+                    placeholder="B"
+                    data-rgb-b
+                    className="w-full p-2 rounded-lg bg-white border border-zinc-200 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20"
+                    onChange={(e) => {
+                      const b = parseInt(e.target.value) || 0;
+                      if (b <= 255 && b >= 0) {
+                        const currentRgb = hexToRgb(accentColor);
+                        const r = currentRgb?.r || 0;
+                        const g = currentRgb?.g || 0;
+                        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+                        setAccentColor(hex);
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    const hex = prompt('Enter hex color (e.g., #EF8354):');
+                    if (hex && /^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                      setAccentColor(hex);
+                      toast.success(`Theme color set to ${hex}`);
+                    } else if (hex) {
+                      toast.error('Invalid hex color format');
+                    }
+                  }}
+                  className="px-3 py-2 rounded-lg bg-zinc-200 text-xs font-semibold text-zinc-700 hover:bg-zinc-300 transition-colors"
+                >
+                  Hex
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Color Presets */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-zinc-600 mb-3">Quick Presets</p>
+              <div className="grid grid-cols-8 gap-2">
                 {COLOR_PALETTE.map(color => (
                   <button
                     key={color.value}
                     onClick={() => { setAccentColor(color.value); toast.success(`Theme changed to ${color.name}`); }}
-                    className={`group relative w-full aspect-square rounded-xl transition-all hover:scale-110 ${
-                      accentColor === color.value ? 'ring-2 ring-offset-2 ring-zinc-400 scale-110' : ''
-                    }`}
+                    className={`group relative w-full aspect-square rounded-lg transition-all hover:scale-110 ${accentColor === color.value ? 'ring-2 ring-offset-2 ring-zinc-400 scale-110' : ''
+                      }`}
                     style={{ backgroundColor: color.value }}
                     title={color.name}
                   >
                     {accentColor === color.value && (
-                      <CheckCircle2 size={20} className="absolute inset-0 m-auto text-white drop-shadow-lg" />
+                      <CheckCircle2 size={14} className="absolute inset-0 m-auto text-white drop-shadow-lg" />
                     )}
-                    <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-medium text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {color.name}
-                    </span>
                   </button>
                 ))}
               </div>
-            )}
+            </div>
 
-            <p className="text-[10px] text-zinc-400 mt-4 text-center">
-              ✨ Your color choice is saved and applied across the entire app
+            <p className="text-[10px] text-zinc-400 text-center">
+              ✨ Your color is saved and applied across the entire app
             </p>
           </div>
 
@@ -476,7 +565,7 @@ export default function SettingsPage() {
                 View All <ChevronRight size={14} />
               </a>
             </div>
-            
+
             {recentImages.length > 0 ? (
               <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                 {recentImages.map(img => (

@@ -15,6 +15,7 @@ import { storage, generateId, formatDate } from '@/lib/utils';
 import { HistoryItem, GenerationParams } from '@/types';
 import { ART_STYLES, STYLE_CATEGORIES, ArtStyle } from '@/lib/styles';
 import { generateRandomPrompt, getRandomAppend, processPromptVariables } from '@/lib/prompts';
+import { useTheme } from '@/lib/theme';
 
 // =============================================
 //  CONSTANTS
@@ -66,7 +67,7 @@ const DEFAULT_MODELS = [
 
 // Helper function to filter models by supported endpoints
 function filterModelsByEndpoint(models: any[], endpoint: string): any[] {
-  return models.filter(m => 
+  return models.filter(m =>
     m.supported_endpoints?.includes(endpoint)
   );
 }
@@ -80,8 +81,8 @@ function getImageModels(models: any[]): any[] {
     // Primary filter: output must include 'image'
     const outputsImage = m.output_modalities?.includes('image');
     // If supported_endpoints exists, also check it includes an image endpoint
-    const hasImageEndpoint = !m.supported_endpoints || 
-      m.supported_endpoints.some((ep: string) => 
+    const hasImageEndpoint = !m.supported_endpoints ||
+      m.supported_endpoints.some((ep: string) =>
         ep.includes('image') || ep.includes('/v1/images')
       );
     return outputsImage && hasImageEndpoint;
@@ -90,7 +91,7 @@ function getImageModels(models: any[]): any[] {
 
 // Filter video models (models that output video)
 function getVideoModels(models: any[]): any[] {
-  return models.filter(m => 
+  return models.filter(m =>
     m.output_modalities?.includes('video') ||
     m.supported_endpoints?.includes('/video/{prompt}')
   );
@@ -98,7 +99,7 @@ function getVideoModels(models: any[]): any[] {
 
 // Filter text models (models that support text generation)
 function getTextModelsForEnhancement(models: any[]): any[] {
-  return models.filter(m => 
+  return models.filter(m =>
     m.supported_endpoints?.includes('/v1/chat/completions') ||
     m.supported_endpoints?.includes('/text/{prompt}')
   ).filter(m => m.output_modalities?.includes('text'));
@@ -111,6 +112,9 @@ const BYOP_AUTH_URL = 'https://enter.pollinations.ai/authorize';
 //  MAIN COMPONENT
 // =============================================
 export default function SpatialImageEditor() {
+  // Theme
+  const { accentColor } = useTheme();
+
   // UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
@@ -152,10 +156,10 @@ export default function SpatialImageEditor() {
 
   // Variations state
   const [generatingVariations, setGeneratingVariations] = useState<string | null>(null);
-  const [variationBaseImage, setVariationBaseImage] = useState<{id: string; url: string; prompt: string} | null>(null);
+  const [variationBaseImage, setVariationBaseImage] = useState<{ id: string; url: string; prompt: string } | null>(null);
 
   // Comparison state
-  const [comparisonImages, setComparisonImages] = useState<{left: string; right: string} | null>(null);
+  const [comparisonImages, setComparisonImages] = useState<{ left: string; right: string } | null>(null);
 
   // Parameters
   const [aspectRatio, setAspectRatio] = useState(ASPECT_RATIOS[5]);
@@ -180,7 +184,7 @@ export default function SpatialImageEditor() {
   const [customStyleName, setCustomStyleName] = useState('');
   const [customStylePrompt, setCustomStylePrompt] = useState('');
   const [customStyles, setCustomStyles] = useState<ArtStyle[]>([]);
-  
+
   // Load custom styles from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('pollinations_custom_styles');
@@ -192,8 +196,22 @@ export default function SpatialImageEditor() {
         console.error('Failed to load custom styles:', e);
       }
     }
+
+    // Load canvas images from localStorage
+    const savedCanvas = localStorage.getItem('pollinations_canvas_images');
+    if (savedCanvas) {
+      try {
+        const parsed = JSON.parse(savedCanvas);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCanvasImages(parsed);
+          console.log('Loaded canvas images from localStorage:', parsed.length);
+        }
+      } catch (e) {
+        console.error('Failed to load canvas images:', e);
+      }
+    }
   }, []);
-  
+
   // Save custom style
   const handleSaveCustomStyle = () => {
     if (!customStyleName.trim() || !customStylePrompt.trim()) {
@@ -215,7 +233,7 @@ export default function SpatialImageEditor() {
     setShowCustomStyleModal(false);
     toast.success('Custom style saved!');
   };
-  
+
   // Delete custom style
   const handleDeleteCustomStyle = (styleId: string) => {
     const updated = customStyles.filter(s => s.id !== styleId);
@@ -223,11 +241,11 @@ export default function SpatialImageEditor() {
     localStorage.setItem('pollinations_custom_styles', JSON.stringify(updated));
     toast.success('Custom style deleted');
   };
-  
+
   // Batch generation
   const [batchSize, setBatchSize] = useState(1);
   const [isBatchGenerating, setIsBatchGenerating] = useState(false);
-  
+
   // Advanced parameters
   const [negativePrompt, setNegativePrompt] = useState('');
   const [nologo, setNologo] = useState(false);
@@ -242,37 +260,44 @@ export default function SpatialImageEditor() {
   //  Live Models Fetch (Image models only)
   // =============================================
   useEffect(() => {
-    fetch('https://image.pollinations.ai/models')
+    // Fetch from gen.pollinations.ai/image/models as specified
+    fetch('https://gen.pollinations.ai/image/models')
       .then(res => res.json())
       .then((data: any[]) => {
         console.log('📦 All models from API:', data.length);
         if (data[0]) {
           console.log('Sample model structure:', JSON.stringify(Object.keys(data[0])));
-          console.log('Sample model:', data[0].name || data[0].id, 'output_modalities:', data[0].output_modalities);
+          console.log('Sample model:', data[0].name, 'output_modalities:', data[0].output_modalities, 'input_modalities:', data[0].input_modalities);
         }
-        
-        // Filter for image models only
-        const imageModels = getImageModels(data);
+
+        // Filter for image models only based on input_modalities and output_modalities
+        // Models that accept image input are for editing
+        // Models that output image are for generation
+        const imageModels = data.filter((m: any) => {
+          // Check if model outputs images
+          const outputsImage = m.output_modalities?.includes('image');
+          return outputsImage;
+        });
         console.log('✅ Filtered image models:', imageModels.length);
-        
+
         // Log which models support image editing (accept image input)
         const editModels = imageModels.filter((m: any) => m.input_modalities?.includes('image'));
         const genOnlyModels = imageModels.filter((m: any) => !m.input_modalities?.includes('image'));
-        console.log('🖊️ Edit-capable models:', editModels.map((m: any) => m.name || m.id));
-        console.log('🖼️ Generation-only models:', genOnlyModels.map((m: any) => m.name || m.id));
-        
+        console.log('🖊️ Edit-capable models:', editModels.map((m: any) => m.name));
+        console.log('🖼️ Generation-only models:', genOnlyModels.map((m: any) => m.name));
+
         if (imageModels.length > 0) {
           // Store raw model data keyed by name for later lookup
           const rawData: Record<string, any> = {};
           imageModels.forEach((m: any) => {
-            rawData[m.name || m.id] = m;
+            rawData[m.name] = m;
           });
           setRawModelData(rawData);
-          
-          // API uses `name` as the identifier, not `id`
+
+          // API uses `name` as the identifier
           setModels(imageModels.map((m: any) => ({
-            value: m.name || m.id,
-            label: m.description || m.name || m.id,
+            value: m.name,
+            label: m.description || m.name,
           })));
         } else {
           console.warn('No image models found from API, using defaults');
@@ -285,7 +310,7 @@ export default function SpatialImageEditor() {
     if (referenceImages.length > 0 && Object.keys(rawModelData).length > 0) {
       const modelData = rawModelData[selectedModel];
       const supportsImageInput = modelData?.input_modalities?.includes('image');
-      
+
       if (!supportsImageInput) {
         // Find the first model that supports image editing
         const firstEditModel = models.find(m => rawModelData[m.value]?.input_modalities?.includes('image'));
@@ -340,10 +365,10 @@ export default function SpatialImageEditor() {
   const handleImageMouseDown = useCallback((e: React.MouseEvent, imageId: string) => {
     e.stopPropagation();
     if (activeTool !== 'pointer') return;
-    
+
     const img = canvasImages.find(i => i.id === imageId);
     if (!img) return;
-    
+
     // Calculate offset from image corner
     setDragOffset({
       x: e.clientX - (img.x * zoom + pan.x),
@@ -358,14 +383,14 @@ export default function SpatialImageEditor() {
     if (isPanning) {
       setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     }
-    
+
     // Handle image dragging
     if (isDraggingImage && dragImageId && activeTool === 'pointer') {
       const newX = (e.clientX - dragOffset.x - pan.x) / zoom;
       const newY = (e.clientY - dragOffset.y - pan.y) / zoom;
-      
-      setCanvasImages(prev => prev.map(img => 
-        img.id === dragImageId 
+
+      setCanvasImages(prev => prev.map(img =>
+        img.id === dragImageId
           ? { ...img, x: newX, y: newY }
           : img
       ));
@@ -400,7 +425,7 @@ export default function SpatialImageEditor() {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       const panSpeed = 50 / zoom;
-      
+
       // Arrow keys for panning
       if (e.key === 'ArrowUp') {
         e.preventDefault();
@@ -462,27 +487,27 @@ export default function SpatialImageEditor() {
     if (isGenerating) return;
     const promptToUse = singlePrompt || prompt;
     const styleToUse = singleStyle || selectedStyle;
-    
+
     if (!promptToUse.trim()) { toast.error('Please enter a prompt'); return; }
     if (!hasApiKey) { toast.error('Add your API key in Settings'); return; }
 
     setIsGenerating(true);
     try {
       const actualSeed = seed === -1 ? Math.floor(Math.random() * 999999999) : seed;
-      
+
       // Process style prompt
       let fullPrompt = promptToUse;
       if (styleToUse.prompt) {
-        fullPrompt = styleToUse.prompt 
+        fullPrompt = styleToUse.prompt
           ? `${styleToUse.prompt}, ${promptToUse}`
           : promptToUse;
       }
-      
+
       // Process variables in prompt
       fullPrompt = processPromptVariables(fullPrompt);
-      
+
       // Combine negative prompts
-      const fullNegative = negativePrompt 
+      const fullNegative = negativePrompt
         ? `${styleToUse.negative}${styleToUse.negative && negativePrompt ? ', ' : ''}${negativePrompt}`
         : styleToUse.negative;
 
@@ -497,11 +522,11 @@ export default function SpatialImageEditor() {
         console.log('📷 Reference images:', referenceImages);
         console.log('📝 Prompt:', fullPrompt);
         console.log('🔧 Using selected model:', selectedModel);
-        
+
         // Ensure the selected model actually supports image editing
         const modelData = rawModelData[selectedModel];
         const supportsImageInput = modelData?.input_modalities?.includes('image');
-        
+
         if (!supportsImageInput) {
           toast.error(`The selected model "${selectedModel}" does not support image editing. Please select a different model.`);
           setIsGenerating(false);
@@ -553,14 +578,14 @@ export default function SpatialImageEditor() {
         } else {
           imageUrl = await pollinationsAPI.generateImage(params);
         }
-        
+
         toast.success('Image generated!');
       }
 
       // Place image on canvas with staggered position to avoid overlap
       const viewportCenterX = (-pan.x + window.innerWidth / 2) / zoom;
       const viewportCenterY = (-pan.y + window.innerHeight / 2) / zoom;
-      
+
       // Calculate offset based on number of existing images
       const offset = canvasImages.length * 50;
       const staggeredX = viewportCenterX - aspectRatio.width / 2 + (offset % 300);
@@ -578,19 +603,19 @@ export default function SpatialImageEditor() {
 
       // Save history with correct type
       const historyItem: HistoryItem = {
-        id: generateId(), 
-        type: isEditMode ? 'edit' : 'generate', 
+        id: generateId(),
+        type: isEditMode ? 'edit' : 'generate',
         prompt: fullPrompt,
-        model: selectedModel, 
-        imageUrl, 
+        model: selectedModel,
+        imageUrl,
         params: {
-          model: selectedModel, 
+          model: selectedModel,
           prompt: fullPrompt,
-          width: aspectRatio.width, 
+          width: aspectRatio.width,
           height: aspectRatio.height,
-          seed: actualSeed, 
-          enhance, 
-          safe, 
+          seed: actualSeed,
+          enhance,
+          safe,
           quality: 'high' as const,
           negativePrompt: fullNegative || undefined,
           nologo,
@@ -598,17 +623,20 @@ export default function SpatialImageEditor() {
           styleStrength,
           guidanceScale,
           steps,
-        }, 
+        },
         createdAt: Date.now(),
         referenceImage: isEditMode ? referenceImages[0] : undefined,
       };
       storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 30));
 
+      // Save canvas images to localStorage
+      localStorage.setItem('pollinations_canvas_images', JSON.stringify([...canvasImages, newImg]));
+
       // Clear reference images after successful generation
       if (isEditMode) {
         setReferenceImages([]);
       }
-      
+
       if (window.innerWidth < 768) setIsSidebarOpen(false);
     } catch (error) {
       console.error('Generation error:', error);
@@ -622,7 +650,7 @@ export default function SpatialImageEditor() {
   const handleBatchGenerate = async () => {
     if (isBatchGenerating || batchSize <= 1) return;
     setIsBatchGenerating(true);
-    
+
     try {
       for (let i = 0; i < batchSize; i++) {
         await handleGenerate();
@@ -662,12 +690,12 @@ export default function SpatialImageEditor() {
       }
 
       const toastId = `upload-${file.name}`;
-      
+
       try {
         toast.loading('Uploading image to Pollinations CDN...', { id: toastId });
-        
+
         const imageUrl = await pollinationsAPI.uploadImage(file);
-        
+
         if (imageUrl) {
           setReferenceImages(prev => {
             if (prev.length >= 4) return prev;
@@ -743,11 +771,11 @@ export default function SpatialImageEditor() {
   };
 
   // Generate variation of an image
-  const generateVariations = async (image: {id: string; url: string; prompt: string}) => {
+  const generateVariations = async (image: { id: string; url: string; prompt: string }) => {
     if (!hasApiKey) { toast.error('Add API key first'); return; }
     setGeneratingVariations(image.id);
     setVariationBaseImage(image);
-    
+
     try {
       const variationSeed = Math.floor(Math.random() * 999999999);
       const canvasImg = canvasImages.find(img => img.id === image.id);
@@ -761,9 +789,9 @@ export default function SpatialImageEditor() {
         safe,
         quality: 'high' as const,
       };
-      
+
       const imageUrl = await pollinationsAPI.generateImage(params);
-      
+
       // Add variation to canvas slightly offset
       const newVariation = {
         id: generateId(),
@@ -771,13 +799,13 @@ export default function SpatialImageEditor() {
         prompt: image.prompt,
         width: params.width,
         height: params.height,
-        x: (canvasImg?.x || 0) + 50, 
+        x: (canvasImg?.x || 0) + 50,
         y: (canvasImg?.y || 0) + 50,
       };
-      
+
       setCanvasImages(prev => [...prev, newVariation]);
       setSelectedImageId(newVariation.id);
-      
+
       toast.success('Variation generated!');
     } catch (error) {
       console.error('Variation error:', error);
@@ -832,7 +860,12 @@ export default function SpatialImageEditor() {
   };
 
   const deleteImage = (id: string) => {
-    setCanvasImages(prev => prev.filter(img => img.id !== id));
+    setCanvasImages(prev => {
+      const newImages = prev.filter(img => img.id !== id);
+      // Save to localStorage
+      localStorage.setItem('pollinations_canvas_images', JSON.stringify(newImages));
+      return newImages;
+    });
     if (selectedImageId === id) setSelectedImageId(null);
     toast.success('Removed from canvas');
   };
@@ -877,9 +910,9 @@ export default function SpatialImageEditor() {
       const rect = canvas.getBoundingClientRect();
       const cx = 'touches' in e ? e.touches[0]?.clientX : e.clientX;
       const cy = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
-      return { 
-        x: (cx || 0) - rect.left, 
-        y: (cy || 0) - rect.top 
+      return {
+        x: (cx || 0) - rect.left,
+        y: (cy || 0) - rect.top
       };
     };
 
@@ -888,7 +921,7 @@ export default function SpatialImageEditor() {
       setIsDrawing(true);
       const point = getCanvasCoords(e);
       setCurrentStroke([point]);
-      
+
       ctx.strokeStyle = penColor;
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
@@ -902,7 +935,7 @@ export default function SpatialImageEditor() {
       e.preventDefault();
       const point = getCanvasCoords(e);
       setCurrentStroke(prev => [...prev, point]);
-      
+
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
     };
@@ -910,7 +943,7 @@ export default function SpatialImageEditor() {
     const stopDrawing = () => {
       if (!isDrawing) return;
       setIsDrawing(false);
-      
+
       if (currentStroke.length > 0) {
         const newStroke = {
           id: generateId(),
@@ -933,7 +966,7 @@ export default function SpatialImageEditor() {
     canvas.addEventListener('touchstart', startDrawing, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
-    
+
     return () => {
       canvas.removeEventListener('mousedown', startDrawing);
       canvas.removeEventListener('mousemove', draw);
@@ -949,7 +982,7 @@ export default function SpatialImageEditor() {
   //  RENDER
   // =============================================
   return (
-    <div className="w-full h-[100dvh] relative selection:bg-[#EF8354] selection:text-white overflow-hidden">
+    <div className="w-full h-[100dvh] relative overflow-hidden" style={{ selectionColor: accentColor }}>
 
       {/* =========================================
           INFINITE CANVAS (full viewport)
@@ -970,17 +1003,19 @@ export default function SpatialImageEditor() {
           {canvasImages.map((img, index) => (
             <div
               key={img.id}
-              className={`absolute group transition-all duration-200 ${
-                selectedImageId === img.id
-                  ? 'ring-4 ring-[#EF8354] ring-offset-2 ring-offset-white/30 shadow-2xl shadow-[#EF8354]/30'
-                  : 'hover:ring-2 hover:ring-[#EF8354]/40 hover:shadow-xl'
-              } ${activeTool === 'pointer' ? 'cursor-grab' : 'cursor-default'} ${isDraggingImage && dragImageId === img.id ? '!cursor-grabbing' : ''}`}
+              className={`absolute group transition-all duration-200 ${selectedImageId === img.id
+                ? 'ring-4 ring-offset-2 ring-offset-white/30 shadow-2xl'
+                : 'hover:ring-2 hover:shadow-xl'
+                } ${activeTool === 'pointer' ? 'cursor-grab' : 'cursor-default'} ${isDraggingImage && dragImageId === img.id ? '!cursor-grabbing' : ''}`}
               style={{
                 left: img.x,
                 top: img.y,
                 width: img.width,
                 height: img.height,
                 zIndex: selectedImageId === img.id ? 100 : index,
+                ringColor: accentColor,
+                ringOffsetColor: 'rgba(255,255,255,0.3)',
+                boxShadow: selectedImageId === img.id ? `0 20px 50px -12px ${accentColor}66` : undefined,
               }}
               onClick={(e) => { e.stopPropagation(); if (activeTool === 'pointer') setSelectedImageId(img.id); }}
               onMouseDown={(e) => handleImageMouseDown(e, img.id)}
@@ -991,26 +1026,26 @@ export default function SpatialImageEditor() {
                 className="w-full h-full object-cover rounded-2xl shadow-lg pointer-events-none"
                 draggable={false}
               />
-              
+
               {/* Generation overlay for variations */}
               {generatingVariations === img.id && (
                 <div className="absolute inset-0 bg-white/40 rounded-2xl flex items-center justify-center backdrop-blur-sm z-50">
                   <div className="bg-white/80 p-4 rounded-full flex flex-col items-center justify-center gap-2 shadow-xl border border-zinc-100">
-                    <Loader2 size={32} className="animate-spin text-[#EF8354]" />
+                    <Loader2 size={32} className="animate-spin" style={{ color: accentColor }} />
                     <span className="text-[10px] font-bold text-zinc-700 uppercase tracking-wider">Generating...</span>
                   </div>
                 </div>
               )}
 
               {/* Hover actions - responsive size based on image */}
-              <div className={`absolute -top-3 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ${
-                img.width < 400 ? 'scale-75' : img.width < 800 ? 'scale-90' : 'scale-100'
-              }`}>
+              <div className={`absolute -top-3 right-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 ${img.width < 400 ? 'scale-75' : img.width < 800 ? 'scale-90' : 'scale-100'
+                }`}>
                 {/* Variations button */}
                 <button
-                  onClick={(e) => { e.stopPropagation(); generateVariations({id: img.id, url: img.url, prompt: img.prompt}); }}
+                  onClick={(e) => { e.stopPropagation(); generateVariations({ id: img.id, url: img.url, prompt: img.prompt }); }}
                   disabled={generatingVariations === img.id}
-                  className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:text-[#EF8354] hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md disabled:opacity-50"
+                  style={{ hoverColor: accentColor }}
                 >
                   {generatingVariations === img.id ? (
                     <Loader2 size={12} className="animate-spin" />
@@ -1019,10 +1054,10 @@ export default function SpatialImageEditor() {
                   )}
                   <span className="hidden sm:inline">{generatingVariations === img.id ? 'Loading' : 'Variation'}</span>
                 </button>
-                
+
                 <button
                   onClick={(e) => { e.stopPropagation(); downloadImage(img.url, img.id); }}
-                  className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:text-[#EF8354] hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md"
+                  className="px-3 py-1.5 rounded-full glass-panel text-xs font-semibold text-zinc-700 hover:bg-white/80 transition-all flex items-center gap-1.5 shadow-lg backdrop-blur-md"
                 >
                   <Download size={12} />
                   <span className="hidden sm:inline">Download</span>
@@ -1042,7 +1077,7 @@ export default function SpatialImageEditor() {
 
               {/* Selection indicator */}
               {selectedImageId === img.id && (
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#EF8354] text-white text-[10px] font-bold uppercase tracking-wider shadow-lg">
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-white text-[10px] font-bold uppercase tracking-wider shadow-lg" style={{ backgroundColor: accentColor }}>
                   Selected
                 </div>
               )}
@@ -1054,10 +1089,10 @@ export default function SpatialImageEditor() {
             <canvas
               ref={drawingCanvasRef}
               className="absolute touch-none pointer-events-none"
-              style={{ 
-                left: -5000, 
-                top: -5000, 
-                width: 10000, 
+              style={{
+                left: -5000,
+                top: -5000,
+                width: 10000,
                 height: 10000,
                 zIndex: 100,
               }}
@@ -1069,11 +1104,11 @@ export default function SpatialImageEditor() {
         {canvasImages.length === 0 && !isGenerating && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="text-center select-none">
-              <div className="w-20 h-20 rounded-3xl bg-[#EF8354]/10 flex items-center justify-center mx-auto mb-5">
-                <Wand2 size={36} className="text-[#EF8354]" />
+              <div className="w-20 h-20 rounded-3xl mb-5 flex items-center justify-center mx-auto" style={{ backgroundColor: `${accentColor}1A` }}>
+                <Wand2 size={36} style={{ color: accentColor }} />
               </div>
               <h2 className="text-xl font-bold text-zinc-700 mb-2">Start Creating</h2>
-              <p className="text-sm text-zinc-400 max-w-[300px] mx-auto">Enter a prompt and click Generate.<br/>Scroll to zoom · Drag with Hand tool to pan</p>
+              <p className="text-sm text-zinc-400 max-w-[300px] mx-auto">Enter a prompt and click Generate.<br />Scroll to zoom · Drag with Hand tool to pan</p>
             </div>
           </div>
         )}
@@ -1082,7 +1117,7 @@ export default function SpatialImageEditor() {
         {isGenerating && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
             <div className="glass-panel rounded-3xl px-8 py-6 flex flex-col items-center gap-3 animate-fade-in">
-              <Loader2 className="animate-spin text-[#EF8354]" size={36} />
+              <Loader2 className="animate-spin" size={36} style={{ color: accentColor }} />
               <span className="font-semibold text-zinc-700 text-sm">Synthesizing {aspectRatio.label} Image...</span>
             </div>
           </div>
@@ -1106,7 +1141,7 @@ export default function SpatialImageEditor() {
 
           {/* Gallery / Menu button */}
           <button
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors font-medium text-sm ${menuOpen ? 'bg-[#EF8354]/10 text-[#EF8354]' : 'text-zinc-700 hover:bg-black/5'}`}
           >
             <LayoutGrid size={16} />
@@ -1243,7 +1278,7 @@ export default function SpatialImageEditor() {
               <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">Optional</span>
             )}
           </div>
-          
+
           {referenceImages.length > 0 && (
             <div className="p-3 rounded-xl bg-[#EF8354]/5 border border-[#EF8354]/20">
               <p className="text-[10px] text-zinc-600 leading-relaxed">
@@ -1251,12 +1286,12 @@ export default function SpatialImageEditor() {
               </p>
             </div>
           )}
-          
+
           {referenceImages.length > 0 && (
             <div className="grid grid-cols-2 gap-2 mb-3">
               {referenceImages.map((imgUrl, i) => (
                 <div key={i} className="relative aspect-square rounded-xl overflow-hidden group">
-                  <img src={imgUrl} alt={`Ref ${i+1}`} className="w-full h-full object-cover" />
+                  <img src={imgUrl} alt={`Ref ${i + 1}`} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button onClick={(e) => { e.stopPropagation(); removeReferenceImage(i); }} className="p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors">
                       <Trash2 size={12} />
@@ -1289,10 +1324,10 @@ export default function SpatialImageEditor() {
               </div>
             </div>
           )}
-          
-          <button 
-             onClick={(e) => { e.stopPropagation(); handleAddUrl(); }} 
-             className={`w-full text-xs font-semibold py-2.5 rounded-xl border border-zinc-200/50 bg-white/40 hover:bg-[#EF8354]/5 hover:text-[#EF8354] transition-all
+
+          <button
+            onClick={(e) => { e.stopPropagation(); handleAddUrl(); }}
+            className={`w-full text-xs font-semibold py-2.5 rounded-xl border border-zinc-200/50 bg-white/40 hover:bg-[#EF8354]/5 hover:text-[#EF8354] transition-all
                ${referenceImages.length >= 4 ? 'hidden' : 'block'}`}
           >
             Or paste image URL
@@ -1331,18 +1366,25 @@ export default function SpatialImageEditor() {
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
+              className="w-full appearance-none bg-zinc-100/80 border border-zinc-200/50 rounded-xl py-3 px-4 pr-10 text-sm font-semibold text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#EF8354]/20 cursor-pointer"
             >
               {models
                 .filter(m => referenceImages.length === 0 || rawModelData[m.value]?.input_modalities?.includes('image'))
                 .map(m => (
                   <option key={m.value} value={m.value}>
-                    {referenceImages.length > 0 ? '✏️ ' : ''}{m.label}
+                    {referenceImages.length > 0 ? '✏️ ' : ''}{rawModelData[m.value]?.paid_only ? '🔒 ' : ''}{m.label}
                   </option>
                 ))}
             </select>
             <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
           </div>
+          {/* Show pro badge if current model is paid_only */}
+          {rawModelData[selectedModel]?.paid_only && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200">
+              <span className="text-[10px]">🔒</span>
+              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Premium Model</span>
+            </div>
+          )}
         </section>
 
         {/* Art Style */}
@@ -1427,7 +1469,7 @@ export default function SpatialImageEditor() {
                   rows={2}
                 />
               </div>
-              
+
               <div className="flex items-center justify-between gap-4">
                 <label className="text-xs font-semibold text-zinc-600 shrink-0">Seed</label>
                 <div className="flex flex-1 items-center bg-zinc-100/80 rounded-lg px-3 py-1.5 border border-zinc-200/50">
@@ -1590,17 +1632,15 @@ export default function SpatialImageEditor() {
             <div className="flex gap-2 overflow-x-auto pb-3 mb-2 shrink-0">
               <button
                 onClick={() => setStyleCategory('All')}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                  styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                }`}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'All' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
               >
                 All
               </button>
               <button
                 onClick={() => setStyleCategory('Custom')}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                  styleCategory === 'Custom' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                }`}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === 'Custom' ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
               >
                 Custom
               </button>
@@ -1608,9 +1648,8 @@ export default function SpatialImageEditor() {
                 <button
                   key={cat}
                   onClick={() => setStyleCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
-                    styleCategory === cat ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                  }`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${styleCategory === cat ? 'bg-[#EF8354] text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    }`}
                 >
                   {cat}
                 </button>
@@ -1639,17 +1678,16 @@ export default function SpatialImageEditor() {
                   </button>
                 </div>
               ))}
-              
+
               {/* Built-in Styles */}
               {styleCategory !== 'Custom' && ART_STYLES.filter(s => styleCategory === 'All' || s.category === styleCategory).map(style => (
                 <button
                   key={style.id}
                   onClick={() => { setSelectedStyle(style); setShowStyleSelector(false); toast.success(`Style "${style.label}" selected`); }}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${
-                    selectedStyle.id === style.id
-                      ? 'border-[#EF8354] bg-[#EF8354]/5'
-                      : 'border-zinc-200 bg-white hover:border-[#EF8354]/50'
-                  }`}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-lg ${selectedStyle.id === style.id
+                    ? 'border-[#EF8354] bg-[#EF8354]/5'
+                    : 'border-zinc-200 bg-white hover:border-[#EF8354]/50'
+                    }`}
                 >
                   <div className="text-lg mb-1">{style.label}</div>
                   <div className="text-[10px] text-zinc-400 truncate">{style.prompt || 'No style modifiers'}</div>
@@ -1739,7 +1777,7 @@ function ComparisonSlider({ leftImage, rightImage }: { leftImage: string; rightI
     >
       {/* Right Image (Background) */}
       <img src={rightImage} alt="Right" className="absolute inset-0 w-full h-full object-cover" />
-      
+
       {/* Left Image (Clipped) */}
       <div
         className="absolute inset-0 overflow-hidden"
@@ -1747,7 +1785,7 @@ function ComparisonSlider({ leftImage, rightImage }: { leftImage: string; rightI
       >
         <img src={leftImage} alt="Left" className="absolute inset-0 w-full h-full object-cover" />
       </div>
-      
+
       {/* Slider Handle */}
       <div
         className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
@@ -1757,7 +1795,7 @@ function ComparisonSlider({ leftImage, rightImage }: { leftImage: string; rightI
           <ArrowRightLeft size={16} className="text-zinc-600" />
         </div>
       </div>
-      
+
       {/* Labels */}
       <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/50 text-white text-xs font-semibold backdrop-blur-sm">
         Original
