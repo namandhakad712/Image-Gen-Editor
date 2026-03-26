@@ -146,6 +146,9 @@ export default function SpatialImageEditor() {
 
   // Load custom styles and canvas images on mount
   useEffect(() => {
+    // Skip if not in browser
+    if (typeof window === 'undefined') return;
+
     // Load custom styles from localStorage
     const saved = localStorage.getItem('pollinations_custom_styles');
     if (saved) {
@@ -159,6 +162,9 @@ export default function SpatialImageEditor() {
 
     // Load canvas images from IndexedDB first (primary), fallback to localStorage
     const loadCanvasImages = async () => {
+      // Skip if not in browser
+      if (typeof window === 'undefined') return;
+
       try {
         // Try to load from IndexedDB first (stores actual image blobs)
         const canvasImagesData = await loadCanvasImagesFromStorage();
@@ -223,6 +229,7 @@ export default function SpatialImageEditor() {
 
   // Save seed locked state to localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     localStorage.setItem('pollinations_seed_locked', JSON.stringify(seedLocked));
   }, [seedLocked]);
 
