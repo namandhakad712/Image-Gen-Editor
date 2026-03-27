@@ -161,6 +161,12 @@ export default function SpatialImageEditor() {
       }
     }
 
+    // Load last prompt from localStorage
+    const savedPrompt = localStorage.getItem('pollinations_last_prompt');
+    if (savedPrompt) {
+      setPrompt(savedPrompt);
+    }
+
     // Load canvas images from IndexedDB first (primary), fallback to localStorage
     const loadCanvasImages = async () => {
       // Skip if not in browser
@@ -233,6 +239,12 @@ export default function SpatialImageEditor() {
     if (typeof window === 'undefined') return;
     localStorage.setItem('pollinations_seed_locked', JSON.stringify(seedLocked));
   }, [seedLocked]);
+
+  // Save prompt to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('pollinations_last_prompt', prompt);
+  }, [prompt]);
 
   // Save custom style
   const handleSaveCustomStyle = () => {
@@ -827,24 +839,9 @@ export default function SpatialImageEditor() {
       setCanvasImages(newImages);
       setSelectedImageId(newImg.id);
 
-      // INSTANT PERSISTENCE: Save to IndexedDB immediately as image is shown
-      // This ensures images are never lost even if browser crashes
-      saveImageInstant(historyItem).then(success => {
-        if (success) {
-          console.log('✅ Image persisted to IndexedDB');
-        } else {
-          console.warn('⚠️ IndexedDB save failed, image still in memory');
-        }
-      });
-
-      // Only update seed display if not locked - keep the value for reference but reset to -1 for next generation
-      if (!seedLocked) {
-        setSeed(-1);
-      }
-
-      // Save history with correct type
+      // Create history item for persistence
       const historyItem: HistoryItem = {
-        id: generateId(),
+        id: newImg.id,
         type: isEditMode ? 'edit' : 'generate',
         prompt: fullPrompt,
         model: selectedModel,
@@ -868,7 +865,24 @@ export default function SpatialImageEditor() {
         createdAt: Date.now(),
         referenceImage: isEditMode ? referenceImages[0] : undefined,
       };
+
+      // INSTANT PERSISTENCE: Save to IndexedDB immediately as image is shown
+      // This ensures images are never lost even if browser crashes
+      saveImageInstant(historyItem).then(success => {
+        if (success) {
+          console.log('✅ Image persisted to IndexedDB');
+        } else {
+          console.warn('⚠️ IndexedDB save failed, image still in memory');
+        }
+      });
+
+      // Save history with correct type
       storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 30));
+
+      // Only update seed display if not locked - keep the value for reference but reset to -1 for next generation
+      if (!seedLocked) {
+        setSeed(-1);
+      }
 
       // Save canvas images to localStorage
       const prevImages = [...canvasImages, newImg];

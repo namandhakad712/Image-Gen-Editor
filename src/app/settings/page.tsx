@@ -588,6 +588,44 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* OpenSource Initiative */}
+          <div className="settings-card md:col-span-2 lg:col-span-3 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-200/30 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                  <Globe size={22} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-zinc-800 text-lg">OpenSource Initiative</h3>
+                  <p className="text-sm text-zinc-500">Help us improve Pollinations AI</p>
+                </div>
+              </div>
+              <a 
+                href="https://github.com/pollinations/pollinations/issues" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white font-semibold text-sm transition-all flex items-center gap-2"
+              >
+                <ExternalLink size={14} />
+                Report Issue
+              </a>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a href="https://github.com/pollinations/pollinations/issues/new?template=bug.md" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
+                🐛 Report Bug
+              </a>
+              <a href="https://github.com/pollinations/pollinations/issues/new?template=feature.md" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
+                💡 Feature Request
+              </a>
+              <a href="https://github.com/pollinations/pollinations/discussions" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
+                💬 General Feedback
+              </a>
+              <a href="https://github.com/pollinations/pollinations" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
+                ⭐ Star on GitHub
+              </a>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

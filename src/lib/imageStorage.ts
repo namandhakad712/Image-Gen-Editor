@@ -84,12 +84,18 @@ async function initDB(): Promise<boolean> {
             const database = (event.target as IDBOpenDBRequest).result;
             console.log('📦 IndexedDB upgrade needed, version:', database.version);
 
-            // Create object store if it doesn't exist
+            // Create object store for generated images if it doesn't exist
             if (!database.objectStoreNames.contains(STORE_NAME)) {
                 const store = database.createObjectStore(STORE_NAME, { keyPath: 'id' });
                 store.createIndex('createdAt', 'createdAt', { unique: false });
                 store.createIndex('storedAt', 'storedAt', { unique: false });
                 console.log('✅ Created object store:', STORE_NAME);
+            }
+
+            // Create object store for canvas positions if it doesn't exist
+            if (!database.objectStoreNames.contains('canvas_positions')) {
+                const posStore = database.createObjectStore('canvas_positions', { keyPath: 'id' });
+                console.log('✅ Created object store: canvas_positions');
             }
         };
     });
