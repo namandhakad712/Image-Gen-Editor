@@ -31,7 +31,7 @@ export const COLOR_PALETTE = [
 ];
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [accentColor, setAccentColorState] = useState('#000000');
+  const [accentColor, setAccentColorState] = useState<string>('#000000');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -44,10 +44,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateCSSVariables = (color: string) => {
+    if (typeof document === 'undefined') return;
     document.documentElement.style.setProperty('--accent-color', color);
     document.documentElement.style.setProperty('--accent-color-light', `${color}20`);
     document.documentElement.style.setProperty('--accent-color-border', `${color}40`);
-    // Update theme-color meta tag for mobile browsers
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
       metaThemeColor.setAttribute('content', color);
@@ -56,14 +56,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setAccentColor = (color: string) => {
     setAccentColorState(color);
-    localStorage.setItem('pollinations_accent_color', color);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pollinations_accent_color', color);
+    }
     updateCSSVariables(color);
   };
 
+  // Prevent hydration mismatch by not rendering children until mounted on client
   if (!mounted) {
-    // Return a minimal provider during SSR to avoid hydration mismatch
     return (
-      <ThemeContext.Provider value={{ accentColor, setAccentColor }}>
+      <ThemeContext.Provider value={{ accentColor: '#000000', setAccentColor }}>
         {children}
       </ThemeContext.Provider>
     );

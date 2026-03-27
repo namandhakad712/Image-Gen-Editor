@@ -118,6 +118,7 @@ export default function SpatialImageEditor() {
   const [styleStrength, setStyleStrength] = useState(75);
   const [guidanceScale, setGuidanceScale] = useState(7.5);
   const [seed, setSeed] = useState(-1);
+  const [seedLocked, setSeedLocked] = useState(false);
   const [steps, setSteps] = useState(30);
   const [activeModifiers, setActiveModifiers] = useState<string[]>([]);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -343,7 +344,6 @@ export default function SpatialImageEditor() {
   const [negativePrompt, setNegativePrompt] = useState('');
   const [nologo, setNologo] = useState(false);
   const [transparent, setTransparent] = useState(false);
-  const [seedLocked, setSeedLocked] = useState(false);
 
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -394,14 +394,15 @@ export default function SpatialImageEditor() {
     return () => ctx.revert();
   }, []);
 
-  // Animate sidebar open/close
+  // Animate sidebar open
   useEffect(() => {
-    if (isSidebarOpen) {
-      gsap.fromTo('.sidebar-panel',
-        { x: -100, opacity: 0 },
-        { x: 0, opacity: 1, duration: 0.35, ease: 'power3.out' }
-      );
-    }
+    const sidebar = document.querySelector('.sidebar-panel') as HTMLElement;
+    if (!sidebar || !isSidebarOpen) return;
+    
+    gsap.fromTo(sidebar,
+      { x: -100, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.35, ease: 'power3.out' }
+    );
   }, [isSidebarOpen]);
 
   // Animate generate button hover
@@ -1459,7 +1460,7 @@ export default function SpatialImageEditor() {
       {!isSidebarOpen && (
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="fixed top-1/2 left-[88vw] md:left-[348px] md:bottom-36 -translate-y-1/2 z-40 p-2.5 glass-panel rounded-full shadow-lg hover:scale-110 transition-all backdrop-blur-xl bg-white/80 group"
+          className="fixed top-1/2 left-4 -translate-y-1/2 z-40 p-2.5 glass-panel rounded-full shadow-lg backdrop-blur-xl bg-white/70 border border-white/30 group"
         >
           <ChevronRight size={18} className="text-zinc-600 group-hover:text-[var(--accent-color)] transition-colors" />
         </button>
@@ -1519,8 +1520,8 @@ export default function SpatialImageEditor() {
         />
       )}
 
-      <aside className={`sidebar-panel fixed top-16 bottom-[160px] md:top-20 md:bottom-36 left-4 md:left-6 w-[85vw] md:w-[340px] max-w-[340px] glass-panel rounded-[28px] p-4 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto transition-all duration-300 ease-out backdrop-blur-xl bg-white/70 border border-white/20
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-[120%] md:-translate-x-[120%]'}`}>
+      <aside className={`sidebar-panel fixed top-16 bottom-24 md:top-20 md:bottom-6 left-4 md:left-6 w-[85vw] md:w-[280px] max-w-[280px] glass-panel rounded-[28px] p-4 md:p-6 z-50 flex flex-col gap-4 custom-scrollbar overflow-y-auto backdrop-blur-xl bg-white/70 border border-white/20
+        ${isSidebarOpen ? 'block' : 'hidden'}`}>
 
         {/* Close button for mobile */}
         <div className="flex items-center justify-between pb-1 shrink-0">
@@ -1820,8 +1821,8 @@ export default function SpatialImageEditor() {
       {/* =========================================
           BOTTOM PANEL: PROMPT & GENERATE
       ========================================= */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-2 md:pb-6">
-        <div className="glass-panel rounded-t-[32px] rounded-b-none p-4 md:p-6 w-full max-w-4xl mx-4 md:mx-auto pointer-events-auto shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] backdrop-blur-xl bg-white/70 border-t border-x border-white/20">
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none pb-1 md:pb-2">
+        <div className="glass-panel rounded-t-[32px] rounded-b-none p-3 md:p-5 w-full max-w-4xl mx-2 md:mx-4 pointer-events-auto shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] backdrop-blur-xl bg-white/70 border-t border-x border-white/20">
 
           {/* Pen tools - show when pen is active */}
           {activeTool === 'pen' && (
