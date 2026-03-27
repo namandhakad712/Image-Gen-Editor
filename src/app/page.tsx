@@ -20,7 +20,7 @@ import { API_CONFIG, MODEL_FILTERS, DEFAULT_MODELS as DEFAULT_IMAGE_MODELS, API_
 import { revokeBlobUrl, cleanupCanvasImages } from '@/lib/canvasUtils';
 import { gsap } from 'gsap';
 import { animateEntrance, animateModalOpen, animateButtonClick, animateToastIn } from '@/lib/gsapAnimations';
-import { imageDB, saveImageInstant, loadImagesFromStorage, loadCanvasImagesFromStorage } from '@/lib/imageStorage';
+import { imageDB, saveImageInstant, loadImagesFromStorage, loadCanvasImagesFromStorage, deleteImageFromStorage } from '@/lib/imageStorage';
 
 // No GSAP plugins needed - using native pointer events for better performance
 
@@ -1120,6 +1120,13 @@ export default function SpatialImageEditor() {
     // Get the image being deleted (to find its URL for history)
     const imgToDelete = canvasImages.find(img => img.id === id);
 
+    // Delete from IndexedDB storage
+    deleteImageFromStorage(id).then(success => {
+      if (success) {
+        console.log('✅ Image deleted from IndexedDB');
+      }
+    });
+
     setCanvasImages(prev => {
       const newImages = prev.filter(img => img.id !== id);
       // Save to localStorage - removes from both canvas AND localStorage
@@ -1140,7 +1147,7 @@ export default function SpatialImageEditor() {
 
   const resetView = () => { setPan({ x: 0, y: 0 }); setZoom(1); };
 
-  // Clear canvas (remove all images from canvas AND localStorage)
+  // Clear canvas (remove all images from canvas view but keep in storage)
   const clearCanvas = () => {
     setCanvasImages([]);
     setSelectedImageId(null);

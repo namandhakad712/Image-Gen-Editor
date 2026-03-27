@@ -588,40 +588,39 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* OpenSource Initiative */}
-          <div className="settings-card md:col-span-2 lg:col-span-3 rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-200/30 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
-                  <Globe size={22} />
+          {/* OpenSource Initiative - My Project */}
+          <div className="settings-card rounded-3xl glass-panel p-6 backdrop-blur-xl bg-gradient-to-br from-zinc-800 to-zinc-900 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white shadow-lg">
+                  <Globe size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-zinc-800 text-lg">OpenSource Initiative</h3>
-                  <p className="text-sm text-zinc-500">Help us improve Pollinations AI</p>
+                  <h3 className="font-bold text-white">OpenSource Project</h3>
+                  <p className="text-xs text-zinc-400">Image Gen Editor Pro</p>
                 </div>
               </div>
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                A powerful AI image generation editor built with Next.js. Star the project and contribute!
+              </p>
               <a 
-                href="https://github.com/pollinations/pollinations/issues" 
+                href="https://github.com/namandhakad712/image-Gen-Editor" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="px-4 py-2 rounded-xl bg-violet-500 hover:bg-violet-600 text-white font-semibold text-sm transition-all flex items-center gap-2"
+                className="flex items-center justify-between p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all group"
               >
-                <ExternalLink size={14} />
-                Report Issue
+                <span className="text-sm font-medium text-white">View on GitHub</span>
+                <ExternalLink size={14} className="text-zinc-400 group-hover:text-white" />
               </a>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <a href="https://github.com/pollinations/pollinations/issues/new?template=bug.md" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
-                🐛 Report Bug
+            <div className="mt-4 flex gap-2">
+              <a href="https://github.com/namandhakad712/image-Gen-Editor/issues" target="_blank" rel="noopener noreferrer" className="flex-1 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-center text-xs font-medium text-white transition-colors">
+                🐛 Issues
               </a>
-              <a href="https://github.com/pollinations/pollinations/issues/new?template=feature.md" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
-                💡 Feature Request
-              </a>
-              <a href="https://github.com/pollinations/pollinations/discussions" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
-                💬 General Feedback
-              </a>
-              <a href="https://github.com/pollinations/pollinations" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-full bg-white/60 border border-violet-200/50 text-xs font-medium text-violet-700 hover:bg-violet-50 transition-colors">
-                ⭐ Star on GitHub
+              <a href="https://github.com/namandhakad712/image-Gen-Editor/discussions" target="_blank" rel="noopener noreferrer" className="flex-1 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-center text-xs font-medium text-white transition-colors">
+                💬 Discuss
               </a>
             </div>
           </div>
