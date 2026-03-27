@@ -1290,12 +1290,10 @@ export default function SpatialImageEditor() {
               className={`absolute group ${selectedImageId === img.id
                 ? 'ring-4 ring-offset-2 ring-offset-white/30 shadow-2xl ring-[var(--accent-color)]'
                 : 'hover:ring-2 hover:shadow-xl'
-                } ${activeTool === 'pointer' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
+              } ${activeTool === 'pointer' ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
               style={{
                 left: img.x,
                 top: img.y,
-                width: img.width,
-                height: img.height,
                 zIndex: selectedImageId === img.id ? 100 : index,
                 boxShadow: selectedImageId === img.id ? `0 20px 50px -12px ${accentColor}66` : undefined,
                 // GPU acceleration for smooth movement
@@ -1308,7 +1306,11 @@ export default function SpatialImageEditor() {
               <img
                 src={img.url}
                 alt={img.prompt}
-                className="w-full h-full object-cover rounded-2xl shadow-lg pointer-events-none"
+                className="max-w-none rounded-2xl shadow-lg pointer-events-none"
+                style={{ 
+                  width: img.width, 
+                  height: img.height 
+                }}
                 draggable={false}
               />
 
