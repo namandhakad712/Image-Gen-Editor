@@ -8,17 +8,18 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { pollinationsAPI } from '@/lib/api';
+import { API_CONFIG } from '@/lib/apiConfig';
 import { storage, generateId } from '@/lib/utils';
 import { HistoryItem } from '@/types';
 import { gsap } from 'gsap';
 
 const DEFAULT_MODELS = [
-  { value: 'flux', label: 'Flux Schnell' },
-  { value: 'kontext', label: 'FLUX.1 Kontext' },
+  { value: 'flux', label: 'FLUX.1 Schnell' },
+  { value: 'kontext', label: 'FLUX.1 Kontext Pro' },
   { value: 'klein', label: 'FLUX.2 Klein 4B' },
   { value: 'gptimage', label: 'GPT Image 1 Mini' },
   { value: 'gptimage-large', label: 'GPT Image 1.5' },
-  { value: 'nanobanana', label: 'NanoBanana' },
+  { value: 'nanobanana', label: 'Nano Banana' },
 ];
 
 export default function EditPage() {
@@ -68,14 +69,18 @@ export default function EditPage() {
   }, []);
 
   useEffect(() => {
-    fetch('https://image.pollinations.ai/models')
+    fetch(`${API_CONFIG.baseUrl}/image/models`)
       .then(res => res.json())
       .then((data: any[]) => {
-        const imageModels = data.filter(m => m.type === 'image' ||
-          (m.output_modalities && (m.output_modalities.includes('image') || m.output_modalities.includes('video')))
-        );
+        // Only image-output models belong in the edit dropdown (exclude video-only)
+        const imageModels = (data || []).filter(m => m.output_modalities?.includes('image'));
         if (imageModels.length > 0) {
-          setModels(imageModels.map(m => ({ value: m.name, label: m.description || m.name })));
+          // Dedupe by name and sort alphabetically
+          const seen = new Set<string>();
+          const unique = imageModels
+            .filter(m => { if (seen.has(m.name)) return false; seen.add(m.name); return true; })
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          setModels(unique.map(m => ({ value: m.name, label: m.title || m.description || m.name })));
         }
       }).catch(err => console.error('Failed to fetch models:', err));
   }, []);

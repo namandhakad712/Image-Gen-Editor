@@ -496,10 +496,10 @@ export default function SpatialImageEditor() {
           });
           setRawModelData(rawData);
 
-          // API uses `name` as the identifier
+          // API uses `name` as the identifier; `title` is the official display name
           setModels(imageModels.map((m: any) => ({
             value: m.name,
-            label: m.description || m.name,
+            label: m.title || m.description || m.name,
           })));
         } else {
           console.warn('No image models found from API, using defaults');
@@ -799,6 +799,8 @@ export default function SpatialImageEditor() {
         if (fullNegative || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
           imageUrl = await pollinationsAPI.generateImageOpenAI({
             prompt: fullPrompt, model: selectedModel,
+            size: `${aspectRatio.width}x${aspectRatio.height}`,
+            quality: 'high' as const,
             seed: actualSeed, safe,
             negative_prompt: fullNegative || undefined,
             transparent: transparent && (selectedModel.includes('gptimage')),

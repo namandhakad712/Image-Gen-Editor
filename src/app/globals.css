@@ -516,9 +516,122 @@ input[type=range]::-moz-range-track {
   }
 }
 
-/* Dark mode support (for future) */
-@media (prefers-color-scheme: dark) {
-  /* Dark mode styles can be added here */
+/* Dark mode support (class-based, toggled by ThemeToggle) */
+.dark body {
+  background-color: #09090b;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+/* Glass surfaces → dark translucent */
+.dark .glass-panel {
+  background: rgba(24, 24, 27, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 32px 64px -16px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.dark .glass-pill {
+  background: rgba(24, 24, 27, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+.dark .glass-overlay {
+  background: rgba(24, 24, 27, 0.5);
+}
+
+.dark .glass-frosted {
+  background: rgba(24, 24, 27, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 40px 80px -20px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+/* Scrollbars */
+.dark .custom-scrollbar::-webkit-scrollbar-thumb,
+.dark .prompt-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark .prompt-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+.dark .prompt-scrollbar::-webkit-scrollbar-track {
+  background: #18181b;
+}
+
+/* Range inputs */
+.dark input[type=range]::-webkit-slider-runnable-track,
+.dark input[type=range]::-moz-range-track {
+  background: #3f3f46;
+}
+
+/* Toggle switch */
+.dark .toggle-switch {
+  background: #3f3f46;
+}
+
+/* Canvas dots */
+.dark .canvas-dots {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+}
+
+/* ============================================================
+   Retrofit common Tailwind utility classes for dark mode
+   (the UI uses hardcoded light zinc/white shades; these
+   overrides make them readable on dark surfaces)
+   ============================================================ */
+.dark .text-zinc-800,
+.dark .text-zinc-900 { color: #f4f4f5; }
+.dark .text-zinc-700 { color: #e4e4e7; }
+.dark .text-zinc-600 { color: #d4d4d8; }
+.dark .text-zinc-500 { color: #a1a1aa; }
+.dark .text-zinc-400 { color: #a1a1aa; }
+.dark .text-zinc-300 { color: #d4d4d8; }
+.dark .text-zinc-200 { color: #e4e4e7; }
+.dark .text-black { color: #fafafa; }
+
+.dark .bg-white { background-color: rgba(24, 24, 27, 0.72); }
+.dark .bg-zinc-50 { background-color: rgba(39, 39, 42, 0.5); }
+.dark .bg-zinc-50\/50 { background-color: rgba(39, 39, 42, 0.5); }
+.dark .bg-zinc-50\/80 { background-color: rgba(39, 39, 42, 0.8); }
+.dark .bg-zinc-100 { background-color: rgba(39, 39, 42, 0.72); }
+.dark .bg-zinc-100\/50 { background-color: rgba(39, 39, 42, 0.5); }
+.dark .bg-zinc-100\/80 { background-color: rgba(39, 39, 42, 0.8); }
+.dark .bg-zinc-200 { background-color: rgba(63, 63, 70, 0.72); }
+.dark .bg-zinc-200\/50 { background-color: rgba(63, 63, 70, 0.5); }
+.dark .bg-zinc-200\/80 { background-color: rgba(63, 63, 70, 0.8); }
+.dark .bg-zinc-300 { background-color: rgba(82, 82, 91, 0.72); }
+.dark .bg-zinc-400 { background-color: rgba(113, 113, 122, 0.72); }
+
+.dark .border-zinc-100 { border-color: rgba(63, 63, 70, 0.4); }
+.dark .border-zinc-200 { border-color: rgba(63, 63, 70, 0.6); }
+.dark .border-zinc-200\/50 { border-color: rgba(63, 63, 70, 0.3); }
+.dark .border-zinc-300 { border-color: rgba(82, 82, 91, 0.6); }
+.dark .border-white { border-color: rgba(255, 255, 255, 0.12); }
+
+/* Gradient backgrounds → dark equivalents */
+.dark .from-zinc-50 { --tw-gradient-from: #27272a; }
+.dark .from-zinc-400 { --tw-gradient-from: #52525b; }
+.dark .from-zinc-500 { --tw-gradient-from: #52525b; }
+.dark .from-zinc-600 { --tw-gradient-from: #3f3f46; }
+.dark .from-zinc-800 { --tw-gradient-from: #18181b; }
+.dark .to-zinc-100 { --tw-gradient-to: #27272a; }
+.dark .to-zinc-500 { --tw-gradient-to: #3f3f46; }
+.dark .to-zinc-600 { --tw-gradient-to: #27272a; }
+.dark .to-zinc-700 { --tw-gradient-to: #18181b; }
+.dark .to-zinc-900 { --tw-gradient-to: #09090b; }
+
+/* Mobile: dark sidebar */
+.dark aside {
+  background-color: rgba(24, 24, 27, 0.92);
 }
 
 /* Print styles */

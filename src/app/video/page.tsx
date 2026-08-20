@@ -106,7 +106,7 @@ export default function VideoPage() {
 
           setModels(videoModels.map(m => ({
             value: m.name,
-            label: m.description || m.name
+            label: m.title || m.description || m.name
           })));
         }
       }).catch(err => console.error('Failed to fetch video models:', err));
