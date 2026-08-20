@@ -56,14 +56,12 @@ export interface GenerationParams {
   width: number;
   height: number;
   seed: number;
-  enhance: boolean;
   safe: boolean;
   quality?: 'low' | 'medium' | 'high' | 'hd';
   image?: string;
   duration?: number;
   aspectRatio?: '16:9' | '9:16';
   audio?: boolean;
-  nologo?: boolean;
   transparent?: boolean;
   styleStrength?: number;
   guidanceScale?: number;
@@ -99,7 +97,7 @@ export interface UserProfile {
   email: string;
   githubUsername?: string;
   image?: string;
-  tier: 'anonymous' | 'microbe' | 'spore' | 'seed' | 'flower' | 'nectar' | 'router';
+  tier?: string;
   createdAt: string;
   nextResetAt?: string;
 }

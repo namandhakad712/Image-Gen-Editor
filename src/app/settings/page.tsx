@@ -135,20 +135,24 @@ export default function SettingsPage() {
 
   const getTierColor = (tier: string) => {
     const colors: Record<string, string> = {
+      none: 'from-zinc-400 to-zinc-500',
       spore: 'from-zinc-500 to-zinc-600',
       seed: 'from-green-500 to-emerald-600',
       flower: 'from-pink-500 to-rose-600',
       nectar: 'from-amber-500 to-orange-600',
+      router: 'from-violet-500 to-purple-600',
     };
     return colors[tier?.toLowerCase()] || 'from-zinc-400 to-zinc-500';
   };
 
   const getTierIcon = (tier: string) => {
     const icons: Record<string, string> = {
+      none: '⚪',
       spore: '🍄',
       seed: '🌱',
       flower: '🌸',
       nectar: '🍯',
+      router: '🚀',
     };
     return icons[tier?.toLowerCase()] || '🌟';
   };
@@ -244,7 +248,7 @@ export default function SettingsPage() {
                     <p className="text-sm text-zinc-500">{profile.email}</p>
                     <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-100 text-xs font-semibold">
                       <Zap size={12} className="text-[var(--accent-color)]" />
-                      {profile.tier.charAt(0).toUpperCase() + profile.tier.slice(1)} Tier
+                      {(profile.tier?.charAt(0)?.toUpperCase() ?? '') + (profile.tier?.slice(1) ?? '')} Tier
                     </div>
                   </div>
                 </div>

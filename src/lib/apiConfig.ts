@@ -38,7 +38,7 @@ export const API_CONFIG = {
     models: {
         // Primary models endpoint - returns all models with their capabilities
         image: '/image/models',
-        video: '/image/models', // Video models are filtered from image models
+        video: '/video/models', // Dedicated video models endpoint (per Pollinations API docs)
         text: '/v1/models',
         audio: '/audio/models',
     },

@@ -124,7 +124,6 @@ export default function SpatialImageEditor() {
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState('flux');
   const [penColor, setPenColor] = useState('var(--accent-color)');
-  const [enhance, setEnhance] = useState(true);
   const [safe, setSafe] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [models, setModels] = useState<Array<{ value: string; label: string }>>([...DEFAULT_IMAGE_MODELS.image]);
@@ -354,7 +353,6 @@ export default function SpatialImageEditor() {
 
   // Advanced parameters
   const [negativePrompt, setNegativePrompt] = useState('');
-  const [nologo, setNologo] = useState(false);
   const [transparent, setTransparent] = useState(false);
 
   // Refs
@@ -775,12 +773,10 @@ export default function SpatialImageEditor() {
           prompt: fullPrompt,
           image: referenceImages.join('|'),
           seed: actualSeed,
-          enhance,
           safe,
           width: aspectRatio.width,
           height: aspectRatio.height,
           negativePrompt: fullNegative || undefined,
-          nologo,
           transparent: transparent && (selectedModel.includes('gptimage')),
         });
 
@@ -791,9 +787,8 @@ export default function SpatialImageEditor() {
         const params: GenerationParams = {
           model: selectedModel, prompt: fullPrompt,
           width: aspectRatio.width, height: aspectRatio.height,
-          seed: actualSeed, enhance, safe, quality: 'high' as const,
+          seed: actualSeed, safe, quality: 'high' as const,
           negativePrompt: fullNegative || undefined,
-          nologo,
           transparent: transparent && (selectedModel.includes('gptimage')),
           styleStrength,
           guidanceScale,
@@ -801,12 +796,11 @@ export default function SpatialImageEditor() {
         };
 
         // Use OpenAI endpoint when we have advanced params
-        if (fullNegative || nologo || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
+        if (fullNegative || transparent || styleStrength !== 75 || guidanceScale !== 7.5 || steps !== 30) {
           imageUrl = await pollinationsAPI.generateImageOpenAI({
             prompt: fullPrompt, model: selectedModel,
-            seed: actualSeed, enhance, safe,
+            seed: actualSeed, safe,
             negative_prompt: fullNegative || undefined,
-            nologo,
             transparent: transparent && (selectedModel.includes('gptimage')),
             style_strength: styleStrength !== 75 ? styleStrength : undefined,
             guidance: guidanceScale !== 7.5 ? guidanceScale : undefined,
@@ -852,11 +846,9 @@ export default function SpatialImageEditor() {
           width: aspectRatio.width,
           height: aspectRatio.height,
           seed: actualSeed,
-          enhance,
           safe,
           quality: 'high' as const,
           negativePrompt: fullNegative || undefined,
-          nologo,
           transparent: transparent && (selectedModel.includes('gptimage')),
           styleStrength,
           guidanceScale,
@@ -896,7 +888,12 @@ export default function SpatialImageEditor() {
       if (window.innerWidth < 768) setIsSidebarOpen(false);
     } catch (error) {
       console.error('Generation error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to generate image');
+      const status = (error as { status?: number })?.status;
+      if (status === 401) {
+        toast.error('Invalid or missing API key — add a valid key in Settings.');
+      } else {
+        toast.error(error instanceof Error ? error.message : 'Failed to generate image');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -1042,7 +1039,6 @@ export default function SpatialImageEditor() {
         width: canvasImg?.width || 1024,
         height: canvasImg?.height || 1024,
         seed: variationSeed,
-        enhance,
         safe,
         quality: 'high' as const,
       };
@@ -1766,16 +1762,8 @@ export default function SpatialImageEditor() {
         {/* Toggles */}
         <section className="space-y-3 shrink-0">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-zinc-700">Enhance</label>
-            <div className={`toggle-switch ${enhance ? 'active' : ''}`} onClick={() => setEnhance(!enhance)} />
-          </div>
-          <div className="flex items-center justify-between">
             <label className="text-sm font-semibold text-zinc-700">Safe Mode</label>
             <div className={`toggle-switch ${safe ? 'active' : ''}`} onClick={() => setSafe(!safe)} />
-          </div>
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-semibold text-zinc-700">No Logo</label>
-            <div className={`toggle-switch ${nologo ? 'active' : ''}`} onClick={() => setNologo(!nologo)} />
           </div>
           {selectedModel.includes('gptimage') && (
             <div className="flex items-center justify-between">

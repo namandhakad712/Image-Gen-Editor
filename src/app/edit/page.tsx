@@ -111,7 +111,6 @@ export default function EditPage() {
         width: 1024,
         height: 1024,
         seed: Math.floor(Math.random() * 999999),
-        enhance: true,
         safe: false,
       });
 
@@ -121,7 +120,7 @@ export default function EditPage() {
       const historyItem: HistoryItem = {
         id: generateId(), type: 'edit', prompt,
         model: selectedModel, imageUrl: result,
-        params: { model: selectedModel, prompt, width: 1024, height: 1024, seed: -1, enhance: true, safe: false },
+        params: { model: selectedModel, prompt, width: 1024, height: 1024, seed: -1, safe: false },
         createdAt: Date.now(), referenceImage: sourceImage,
       };
       storage.setHistory([historyItem, ...storage.getHistory()].slice(0, 50));

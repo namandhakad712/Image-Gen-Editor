@@ -80,17 +80,23 @@ export default function VideoPage() {
     return () => ctx.revert();
   }, []);
 
-  // Fetch video models from live API
-  useEffect(() => {
-    // Fetch from gen.pollinations.ai/image/models as specified
-    fetch('https://gen.pollinations.ai/image/models')
-      .then(res => res.json())
-      .then((data: any[]) => {
-        // Filter for video models based on output_modalities
-        const videoModels = data.filter((m: any) =>
-          m.output_modalities?.includes('video')
-        );
-        if (videoModels.length > 0) {
+    // Fetch video models from live API
+    useEffect(() => {
+      // Dedicated video models endpoint (per Pollinations API docs)
+      const loadVideoModels = (url: string) =>
+        fetch(url).then(res => res.json());
+
+      loadVideoModels('https://gen.pollinations.ai/video/models')
+        .then((data: any[]) => {
+          // Fallback to filtering image models if /video/models is empty/unavailable
+          if (!Array.isArray(data) || data.length === 0) {
+            return loadVideoModels('https://gen.pollinations.ai/image/models')
+              .then((all: any[]) => (all || []).filter((m: any) => m.output_modalities?.includes('video')));
+          }
+          return data;
+        })
+        .then((videoModels: any[]) => {
+          if (videoModels.length > 0) {
           // Store raw model data for paid_only check
           const rawData: Record<string, any> = {};
           videoModels.forEach((m: any) => {
@@ -149,7 +155,6 @@ export default function VideoPage() {
         image: referenceImage || undefined,
         width: aspectRatio === '16:9' ? 1280 : 720,
         height: aspectRatio === '16:9' ? 720 : 1280,
-        enhance: false,
         safe: false,
       };
 

@@ -41,7 +41,6 @@ const decompressHistoryItem = (compressed: any): HistoryItem => ({
     width: compressed.params?.w || 1024,
     height: compressed.params?.h || 1024,
     seed: compressed.params?.s || 0,
-    enhance: false,
     safe: false,
     model: compressed.m,
     prompt: compressed.p,

@@ -289,9 +289,13 @@ export class PollinationsAPI {
 
   async getVideoModels(): Promise<VideoModel[]> {
     try {
-      const response = await this.request<any[]>(`/image/models`, {}, 'getVideoModels');
-      // Filter for video models
-      return (response || []).filter((m: any) =>
+      const response = await this.request<VideoModel[]>(`/video/models`, {}, 'getVideoModels');
+      const models = response || [];
+      if (models.length > 0) return models;
+
+      // Fallback: filter video models from the image models catalogue
+      const all = await this.request<any[]>(`/image/models`, {}, 'getVideoModelsFallback');
+      return (all || []).filter((m: any) =>
         m.output_modalities?.includes('video') || m.type === 'video'
       );
     } catch (error) {
@@ -321,7 +325,10 @@ export class PollinationsAPI {
   }
 
   async generateImage(params: GenerationParams): Promise<string> {
-    const { model, prompt, negativePrompt, width, height, seed, enhance, safe, quality, image, nologo, transparent, styleStrength, guidanceScale, steps } = params;
+    // NOTE: Per the official Pollinations API (v0.3.0), the following GET /image
+    // params are no longer supported and are silently stripped server-side:
+    // nologo, enhance, negative_prompt, style_strength, guidance, steps.
+    const { model, prompt, width, height, seed, safe, quality, image, transparent } = params;
 
     // Validate required parameters
     if (!prompt?.trim()) {
@@ -335,16 +342,10 @@ export class PollinationsAPI {
     urlParams.set('width', width.toString());
     urlParams.set('height', height.toString());
 
-    if (enhance) urlParams.set('enhance', 'true');
     if (safe) urlParams.set('safe', 'true');
-    if (negativePrompt) urlParams.set('negative_prompt', negativePrompt);
     if (quality) urlParams.set('quality', quality);
     if (image) urlParams.set('image', image);
-    if (nologo) urlParams.set('nologo', 'true');
     if (transparent) urlParams.set('transparent', 'true');
-    if (styleStrength) urlParams.set('style_strength', styleStrength.toString());
-    if (guidanceScale) urlParams.set('guidance', guidanceScale.toString());
-    if (steps) urlParams.set('steps', steps.toString());
 
     const encodedPrompt = encodeURIComponent(prompt);
     const imageUrl = `${BASE_URL}/image/${encodedPrompt}?${urlParams.toString()}`;
@@ -389,7 +390,8 @@ export class PollinationsAPI {
   }
 
   async editImage(params: GenerationParams & { image: string }): Promise<string> {
-    const { model, prompt, image, seed, enhance, safe, negativePrompt, nologo, transparent, width, height } = params;
+    // NOTE: nologo/enhance are removed server-side (no longer supported).
+    const { model, prompt, image, seed, safe, negativePrompt, transparent, width, height } = params;
 
     if (!prompt?.trim()) {
       throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
@@ -407,10 +409,8 @@ export class PollinationsAPI {
     formData.append('prompt', prompt);
     formData.append('image', image);
     formData.append('seed', seed.toString());
-    if (enhance) formData.append('enhance', 'true');
     if (safe) formData.append('safe', 'true');
     if (negativePrompt) formData.append('negative_prompt', negativePrompt);
-    if (nologo) formData.append('nologo', 'true');
     if (transparent) formData.append('transparent', 'true');
     formData.append('width', (width || 1024).toString());
     formData.append('height', (height || 1024).toString());
@@ -516,8 +516,6 @@ export class PollinationsAPI {
     size?: string;
     quality?: string;
     seed?: number;
-    nologo?: boolean;
-    enhance?: boolean;
     safe?: boolean;
     negative_prompt?: string;
     transparent?: boolean;
@@ -529,11 +527,27 @@ export class PollinationsAPI {
       throw new ApiErrorImpl(400, 'INVALID_PARAMS', 'Prompt is required');
     }
 
+    // Build payload. nologo/enhance are no longer supported by the endpoint
+    // and are omitted; other fields map to the OpenAI-compatible schema.
+    const payload: Record<string, unknown> = {
+      prompt: params.prompt,
+      model: params.model,
+    };
+    if (params.size) payload.size = params.size;
+    if (params.quality) payload.quality = params.quality;
+    if (params.seed !== undefined) payload.seed = params.seed;
+    if (params.safe) payload.safe = true;
+    if (params.negative_prompt) payload.negative_prompt = params.negative_prompt;
+    if (params.transparent) payload.transparent = true;
+    if (params.style_strength !== undefined) payload.style_strength = params.style_strength;
+    if (params.guidance !== undefined) payload.guidance = params.guidance;
+    if (params.steps !== undefined) payload.steps = params.steps;
+
     return this.request<{ data: Array<{ url?: string; b64_json?: string }> }>(
       `/v1/images/generations`,
       {
         method: 'POST',
-        body: JSON.stringify(params),
+        body: JSON.stringify(payload),
       },
       'generateImageOpenAI'
     ).then(data => {

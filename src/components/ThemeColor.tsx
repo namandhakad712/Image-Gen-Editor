@@ -49,9 +49,8 @@ export function ThemeColorRing({ children, className = '', opacity = 30, ...prop
   const shadowColor = opacity < 100 ? `${accentColor}${Math.round(opacity * 2.55).toString(16).padStart(2, '0')}` : accentColor;
   return (
     <div 
-      style={{ 
+      style={{
         boxShadow: `0 4px 14px ${shadowColor}`,
-        ringColor: accentColor 
       }} 
       className={className} 
       {...props}

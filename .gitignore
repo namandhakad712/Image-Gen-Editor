@@ -24,6 +24,11 @@ next-env.d.ts
 # IDE
 .vscode
 .idea
+.kilo
+.claude
+.pool
+.agents
+.cline
 *.swp
 *.swo
 *~
